@@ -1,23 +1,23 @@
-function SidePanel() {
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+
+export default function SidePanel() {
   return (
-    <div className="w-64 bg-gray-100 border-r border-gray-300 p-2 overflow-y-auto">
-      <h2 className="text-sm font-semibold mb-2">Layers</h2>
-      <ul className="space-y-1 text-sm">
-        <li>
-          <input type="checkbox" className="mr-2" defaultChecked /> World Map
-        </li>
-        <li>
-          <input type="checkbox" className="mr-2" /> Rivers
-        </li>
-        <li>
-          <input type="checkbox" className="mr-2" /> Cities
-        </li>
-        <li>
-          <input type="checkbox" className="mr-2" /> Roads
-        </li>
-      </ul>
-    </div>
+    <PanelGroup direction="vertical">
+      {/* Top section */}
+      <Panel defaultSize={50} minSize={20}>
+        <div className="h-full bg-gray-100 p-2 border-r border-b">
+          <p className="font-medium">Left Top Panel (Text Area)</p>
+        </div>
+      </Panel>
+
+      <PanelResizeHandle className="bg-gray-400 h-1 cursor-row-resize" />
+
+      {/* Bottom section */}
+      <Panel defaultSize={50} minSize={20}>
+        <div className="h-full bg-gray-200 p-2 border-r">
+          <p className="font-medium">Left Bottom Panel (Future Use)</p>
+        </div>
+      </Panel>
+    </PanelGroup>
   );
 }
-
-export default SidePanel;

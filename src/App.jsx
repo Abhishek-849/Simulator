@@ -1,23 +1,28 @@
-import TopBar from "./components/TopBar";
+import TopPanel from "./components/TopPanel";
 import SidePanel from "./components/SidePanel";
 import MapPanel from "./components/MapPanel";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
-function App() {
+export default function App() {
   return (
-    <div className="flex flex-col h-screen">
+    <div className="h-screen w-screen flex flex-col">
       {/* Top bar */}
-      <TopBar />
+      <TopPanel />
 
-      {/* Main body */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <SidePanel />
+      {/* Resizable layout */}
+      <PanelGroup direction="horizontal" className="flex-1">
+        {/* Left panel */}
+        <Panel defaultSize={20} minSize={15}>
+          <SidePanel />
+        </Panel>
 
-        {/* Map */}
-        <MapPanel />
-      </div>
+        <PanelResizeHandle className="bg-gray-400 w-1 cursor-col-resize" />
+
+        {/* Map panel */}
+        <Panel defaultSize={80} minSize={60}>
+          <MapPanel />
+        </Panel>
+      </PanelGroup>
     </div>
   );
 }
-
-export default App;
