@@ -1,21 +1,52 @@
+// src/components/SidePanel.jsx
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 export default function SidePanel() {
   return (
-    <PanelGroup direction="vertical">
-      {/* Top section */}
-      <Panel defaultSize={50} minSize={20}>
-        <div className="h-full bg-gray-100 p-2 border-r border-b">
-          <p className="font-medium">Left Top Panel (Text Area)</p>
+    <PanelGroup direction="vertical" className="h-full">
+      {/* Top area: 4-5 checkboxes (Layers/Options) */}
+      <Panel defaultSize={60} minSize={25}>
+        <div className="h-full bg-gray-100 p-3 overflow-auto">
+          <h3 className="text-sm font-semibold mb-3">Layers & Options</h3>
+
+          <div className="space-y-3 text-sm">
+            <label className="flex items-center">
+              <input type="checkbox" className="mr-2" defaultChecked />
+              <span>Enable Grid</span>
+            </label>
+
+            <label className="flex items-center">
+              <input type="checkbox" className="mr-2" />
+              <span>Show Terrain</span>
+            </label>
+
+            <label className="flex items-center">
+              <input type="checkbox" className="mr-2" />
+              <span>Highlight Roads</span>
+            </label>
+
+            <label className="flex items-center">
+              <input type="checkbox" className="mr-2" defaultChecked />
+              <span>Show Units</span>
+            </label>
+
+            <label className="flex items-center">
+              <input type="checkbox" className="mr-2" />
+              <span>Enable Satellite</span>
+            </label>
+          </div>
         </div>
       </Panel>
 
-      <PanelResizeHandle className="bg-gray-400 h-1 cursor-row-resize" />
+      <PanelResizeHandle className="h-1 bg-gray-300 cursor-row-resize" />
 
-      {/* Bottom section */}
-      <Panel defaultSize={50} minSize={20}>
-        <div className="h-full bg-gray-200 p-2 border-r">
-          <p className="font-medium">Left Bottom Panel (Future Use)</p>
+      {/* Bottom area: reserved for future content (kept empty but styled) */}
+      <Panel defaultSize={40} minSize={15}>
+        <div className="h-full bg-gray-200 p-3">
+          <h3 className="text-sm font-semibold mb-2">Attributes / Legend</h3>
+          <div className="text-xs text-gray-600">
+            (Reserved — will hold layer legend, attributes, filters)
+          </div>
         </div>
       </Panel>
     </PanelGroup>
