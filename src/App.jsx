@@ -1,14 +1,17 @@
 // src/App.jsx
+import { useState } from "react";
 import TopPanel from "./components/TopPanel";
 import SidePanel from "./components/SidePanel";
 import MapPanel from "./components/MapPanel";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 export default function App() {
+  const [selectedFile, setSelectedFile] = useState(null);
+
   return (
     <div className="h-screen w-screen flex flex-col">
       {/* Top bar */}
-      <TopPanel />
+      <TopPanel onFileSelect={setSelectedFile} />
 
       {/* Main resizable area */}
       <PanelGroup direction="horizontal" className="flex-1">
@@ -21,7 +24,7 @@ export default function App() {
 
         {/* Map panel */}
         <Panel defaultSize={80} minSize={60}>
-          <MapPanel />
+          <MapPanel file={selectedFile} />
         </Panel>
       </PanelGroup>
     </div>

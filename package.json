@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "geotiff": "^2.1.4-beta.0",
+    "leaflet-geotiff": "^0.2.0",
     "lucide-react": "^0.542.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

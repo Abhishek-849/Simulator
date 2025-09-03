@@ -45,7 +45,7 @@ export default function SidePanel() {
         <div className="h-full bg-gray-200 p-3">
           <h3 className="text-sm font-semibold mb-2">Attributes / Legend</h3>
           <div className="text-xs text-gray-600">
-            (Reserved — will hold layer legend, attributes, filters)
+            ( layer legend, attributes, filters)
           </div>
         </div>
       </Panel>
