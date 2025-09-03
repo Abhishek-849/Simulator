@@ -7,11 +7,15 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 export default function App() {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [tileUrl, setTileUrl] = useState(null);
 
   return (
     <div className="h-screen w-screen flex flex-col">
       {/* Top bar */}
-      <TopPanel onFileSelect={setSelectedFile} />
+      <TopPanel
+        onFileSelect={setSelectedFile}
+        onTileLayerReady={setTileUrl} // backend tile URL
+      />
 
       {/* Main resizable area */}
       <PanelGroup direction="horizontal" className="flex-1">
@@ -24,7 +28,7 @@ export default function App() {
 
         {/* Map panel */}
         <Panel defaultSize={80} minSize={60}>
-          <MapPanel file={selectedFile} />
+          <MapPanel file={selectedFile} tileUrl={tileUrl} />
         </Panel>
       </PanelGroup>
     </div>

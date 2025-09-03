@@ -5,10 +5,11 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-geotiff";
 import "leaflet-geotiff/leaflet-geotiff-plotty";
 
-export default function MapPanel({ file }) {
+export default function MapPanel({ file, tileUrl }) {
   const [coords, setCoords] = useState({ lat: "0.0000", lng: "0.0000" });
   const mapRef = useRef(null);
   const tiffLayerRef = useRef(null);
+  const tileLayerRef = useRef(null);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -23,18 +24,19 @@ export default function MapPanel({ file }) {
         attribution: "© OpenStreetMap contributors",
       }).addTo(mapRef.current);
     }
+  }, []);
 
-    if (file) {
+  // Load GeoTIFF directly in browser (fallback method)
+  useEffect(() => {
+    if (file && !tileUrl) {
       const reader = new FileReader();
       reader.onload = function (e) {
         const arrayBuffer = e.target.result;
 
-        // Remove old TIFF layer if exists
         if (tiffLayerRef.current) {
           mapRef.current.removeLayer(tiffLayerRef.current);
         }
 
-        // Add new TIFF layer
         const tiffLayer = L.leafletGeotiff(arrayBuffer, {
           renderer: new L.LeafletGeotiff.Plotty({
             displayMin: 0,
@@ -48,7 +50,23 @@ export default function MapPanel({ file }) {
       };
       reader.readAsArrayBuffer(file);
     }
-  }, [file]);
+  }, [file, tileUrl]);
+
+  // Load GDAL preprocessed tiles (preferred method)
+  useEffect(() => {
+    if (tileUrl) {
+      if (tileLayerRef.current) {
+        mapRef.current.removeLayer(tileLayerRef.current);
+      }
+
+      const newTileLayer = L.tileLayer(`${tileUrl}/{z}/{x}/{y}.png`, {
+        attribution: "Processed with GDAL",
+      });
+
+      newTileLayer.addTo(mapRef.current);
+      tileLayerRef.current = newTileLayer;
+    }
+  }, [tileUrl]);
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -61,14 +79,13 @@ export default function MapPanel({ file }) {
 
   return (
     <div className="h-full w-full relative">
-      {/* Leaflet Map */}
       <div
         id="map"
         className="h-full w-full z-0"
         onMouseMove={handleMouseMove}
       ></div>
 
-      {/* Coordinate overlay always above */}
+      {/* Coordinate overlay always on top */}
       <div className="absolute bottom-4 right-4 z-50 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg flex gap-4">
         <div className="flex items-baseline gap-1">
           <span className="text-xs text-gray-300">Lat:</span>

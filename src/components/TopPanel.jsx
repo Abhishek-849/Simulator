@@ -23,14 +23,34 @@ import {
   PlugZap,
 } from "lucide-react";
 
-export default function TopPanel({ onFileSelect }) {
+export default function TopPanel({onFileSelect,onTileLayerReady }) {
   const [openMenu, setOpenMenu] = useState(null);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      onFileSelect(e.target.files[0]);
+
+
+  const handleFileUpload = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch("http://127.0.0.1:5000/process", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+
+    if (data.success) {
+      // Pass the tile layer URL down to MapPanel
+      if (props.onTileLayerReady) {
+        props.onTileLayerReady(data.tile_url);
+      }
+    } else {
+      alert("Backend error: " + data.error);
     }
-  };
+  } catch (err) {
+    console.error("Error uploading:", err);
+  }
+};
 
   const toggleMenu = (menu) => {
     setOpenMenu(openMenu === menu ? null : menu);
@@ -266,12 +286,14 @@ export default function TopPanel({ onFileSelect }) {
 
       {/* Hidden file input for TIFF */}
       <input
-        type="file"
-        id="tiffInput"
-        accept=".tif,.tiff"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+  type="file"
+  accept=".tif,.tiff"
+  onChange={(e) => {
+    if (e.target.files.length > 0) {
+      handleFileUpload(e.target.files[0]);
+    }
+  }}
+/>
     </div>
   );
 }
