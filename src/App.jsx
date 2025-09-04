@@ -39,7 +39,8 @@ export default function App() {
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-100">
       {/* Top navigation bar */}
-      <TopPanel onModelSelect={handleModelSelect} />
+      <TopPanel onModelSelect={handleModelSelect} onClearScene={clearScene} />
+
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
@@ -67,7 +68,8 @@ export default function App() {
           {/* Main 3D view */}
           <Panel defaultSize={80} minSize={60} className="flex flex-col">
             <div className="h-full w-full bg-gray-50">
-              <MapPanel modelFile={modelFile} />
+             <MapPanel modelFile={modelFile} layers={layers} />
+
             </div>
           </Panel>
         </PanelGroup>

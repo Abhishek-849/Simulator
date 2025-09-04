@@ -19,36 +19,29 @@ import {
   ZoomOut,
   EyeOff,
   Layers,
-  Plus,
-  Target,
-  MapPin,
-  Database,
-  Edit2,
-  PlugZap
+  Plus
 } from "lucide-react";
 
-export default function TopPanel({ onModelSelect }) {
+export default function TopPanel({ onModelSelect,onClearScene }) {
   const [openMenu, setOpenMenu] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    
-    // Check if file is .obj
-    if (!file.name.endsWith('.obj')) {
-      alert('Please select a .obj file');
+
+    if (!file.name.endsWith(".obj")) {
+      alert("Please select a .obj file");
       return;
     }
-    
-    // Pass the file to parent component
+
     if (onModelSelect) {
       onModelSelect(file);
     }
   };
 
   const handleClearScene = () => {
-    if (window.confirm('Are you sure you want to clear the current scene?')) {
+    if (window.confirm("Are you sure you want to clear the current scene?")) {
       if (onModelSelect) {
         onModelSelect(null);
       }
@@ -65,7 +58,7 @@ export default function TopPanel({ onModelSelect }) {
       <div className="flex items-center space-x-6 p-3">
         <div className="flex items-center gap-2 text-lg font-semibold">
           <Box size={20} className="text-blue-400" />
-          <span>3D Terrain Viewer</span>
+          <span>Simulator Prototype</span>
         </div>
 
         {/* Menu bar */}
@@ -81,7 +74,7 @@ export default function TopPanel({ onModelSelect }) {
             </button>
             {openMenu === "file" && (
               <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button 
+                <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
                 >
@@ -91,12 +84,13 @@ export default function TopPanel({ onModelSelect }) {
                   <Save size={16} /> Save Project
                 </button>
                 <div className="border-t border-gray-700 my-1"></div>
-                <button 
-                  onClick={handleClearScene}
-                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left text-red-400"
-                >
-                  <Trash2 size={16} /> Clear Scene
-                </button>
+                      <button
+                         onClick={() => window.location.reload()}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                      >
+                        Clear Scene
+                      </button>
+
               </div>
             )}
           </div>
@@ -241,20 +235,12 @@ export default function TopPanel({ onModelSelect }) {
             <option>Strike</option>
           </select>
 
-          <select className="bg-gray-800 text-white px-2 py-1 rounded text-sm">
+          <select className="bg-gray-800 text-white px-2 py-1 mr-24 rounded text-sm">
             <option>Mission Planning</option>
             <option>Recon</option>
             <option>Route Plan</option>
           </select>
 
-          <div className="flex items-center gap-2">
-            <button title="Center" className="p-1 rounded hover:bg-gray-800">
-              <MapPin size={18} />
-            </button>
-            <button title="Crosshair" className="p-1 rounded hover:bg-gray-800">
-              <Target size={18} />
-            </button>
-          </div>
         </div>
       </div>
 
