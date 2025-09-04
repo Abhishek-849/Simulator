@@ -1,19 +1,30 @@
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Stats, DragControls } from "@react-three/drei";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 
-// Soldier model (simple cube for now)
-function Soldier({ position, index }) {
+// Soldier model (cylinder body + sphere head, 25% of previous size)
+function Soldier({ position, index }, ref) {
   return (
-    <mesh position={position} userData={{ index }}>
-      <boxGeometry args={[0.2, 0.5, 0.2]} />
-      <meshStandardMaterial color="green" />
-    </mesh>
+    <group position={position} userData={{ index }} ref={ref}>
+      {/* Body: ~0.1875 units tall, 0.05 units wide */}
+      <mesh position={[0, 0.09375, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
+        <meshStandardMaterial color="green" />
+      </mesh>
+      {/* Head: ~0.0375 units diameter, positioned above body */}
+      <mesh position={[0, 0.20625, 0]}>
+        <sphereGeometry args={[0.01875, 32, 32]} />
+        <meshStandardMaterial color="green" />
+      </mesh>
+    </group>
   );
 }
+
+// Forward ref to Soldier component for DragControls
+const SoldierWithRef = React.forwardRef(Soldier);
 
 // 3D Model Component
 function Model({ url, layerId, visible, onPointerMove }) {
@@ -38,9 +49,9 @@ function Model({ url, layerId, visible, onPointerMove }) {
         if (onPointerMove) {
           const { point } = e;
           onPointerMove({
-            x: point.x.toFixed(2),
-            y: point.y.toFixed(2),
-            z: point.z.toFixed(2),
+            x: (point.x * 100).toFixed(2),
+            y: (point.y * 100).toFixed(2),
+            z: (point.z * 100).toFixed(2),
           });
         }
       }}
@@ -55,6 +66,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
   const planeRef = useRef();
   const soldiersRef = useRef([]);
   const dragControlsRef = useRef();
+  const orbitRef = useRef();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const mouse = useMemo(() => new THREE.Vector2(), []);
   const [previewPosition, setPreviewPosition] = useState(null);
@@ -82,8 +94,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        // Optional: Adjust position to sit on surface (e.g., offset by half soldier height)
-        point.y += 0.25; // Assuming soldier height is 0.5, place bottom at surface
+        point.y += 0.09375; // Offset by half body height (0.1875 / 2)
         setPreviewPosition([point.x, point.y, point.z]);
       } else {
         setPreviewPosition(null);
@@ -116,13 +127,17 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
     };
   }, [deployMode, gl]);
 
-  // Handle soldier dragging
+  // Handle soldier dragging and disable OrbitControls during drag
   useEffect(() => {
     const controls = dragControlsRef.current;
-    if (!controls) return;
+    const orbit = orbitRef.current;
+    if (!controls || !orbit) return;
+
+    const handleDragStart = () => {
+      orbit.enabled = false; // Disable OrbitControls during drag
+    };
 
     const handleDrag = (event) => {
-      // Project dragged position onto terrain or plane
       raycaster.setFromCamera(mouse, camera);
       const terrainObjects = terrainRef.current ? terrainRef.current.children : [];
       const objectsToIntersect = [...terrainObjects, planeRef.current].filter(Boolean);
@@ -130,12 +145,13 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        point.y += 0.25; // Adjust for soldier height
+        point.y += 0.09375; // Offset by half body height
         event.object.position.set(point.x, point.y, point.z);
       }
     };
 
     const handleDragEnd = (event) => {
+      orbit.enabled = true; // Re-enable OrbitControls
       const idx = event.object.userData.index;
       const p = event.object.position;
       setSoldiers((prev) => {
@@ -145,13 +161,16 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
       });
     };
 
+    controls.addEventListener("dragstart", handleDragStart);
     controls.addEventListener("drag", handleDrag);
     controls.addEventListener("dragend", handleDragEnd);
+
     return () => {
+      controls.removeEventListener("dragstart", handleDragStart);
       controls.removeEventListener("drag", handleDrag);
       controls.removeEventListener("dragend", handleDragEnd);
     };
-  }, [dragControlsRef, setSoldiers, raycaster, mouse, camera]);
+  }, [dragControlsRef, orbitRef, setSoldiers, raycaster, mouse, camera]);
 
   // Update mouse position for dragging
   useEffect(() => {
@@ -202,7 +221,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
       {/* Soldiers */}
       {soldiers.map((pos, idx) => (
-        <Soldier
+        <SoldierWithRef
           key={idx}
           position={pos}
           index={idx}
@@ -212,16 +231,22 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
       <DragControls ref={dragControlsRef} objects={soldiersRef.current} />
 
-      {/* Preview soldier */}
+      {/* Preview soldier - matches soldier geometry */}
       {deployMode && previewPosition && (
-        <mesh position={previewPosition}>
-          <boxGeometry args={[0.2, 0.5, 0.2]} />
-          <meshStandardMaterial color="blue" opacity={0.5} transparent />
-        </mesh>
+        <group position={previewPosition}>
+          <mesh position={[0, 0.09375, 0]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
+            <meshStandardMaterial color="blue" opacity={0.5} transparent />
+          </mesh>
+          <mesh position={[0, 0.20625, 0]}>
+            <sphereGeometry args={[0.01875, 32, 32]} />
+            <meshStandardMaterial color="blue" opacity={0.5} transparent />
+          </mesh>
+        </group>
       )}
 
       <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
-      <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
+      <OrbitControls ref={orbitRef} enablePan={true} enableZoom={true} enableRotate={true} />
     </>
   );
 }
@@ -230,7 +255,7 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0, z: 0 });
-  const [soldiers, setSoldiers] = useState([]); // multiple soldiers
+  const [soldiers, setSoldiers] = useState([]);
   const canvasRef = useRef();
 
   useEffect(() => {
@@ -286,14 +311,14 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
 
       <Stats className="!absolute !top-2 !right-2 !left-auto !z-50" />
 
-      {/* Coordinate display */}
+      {/* Coordinate display in meters */}
       <div className="absolute bottom-4 right-4 z-50 bg-gray-900/80 text-white text-sm px-3 py-2 rounded-md shadow-lg">
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <span className="text-gray-300">X:</span>
+          <span className="text-gray-300">X (m):</span>
           <span className="font-mono">{coordinates.x}</span>
-          <span className="text-gray-300">Y:</span>
+          <span className="text-gray-300">Y (m):</span>
           <span className="font-mono">{coordinates.y}</span>
-          <span className="text-gray-300">Z:</span>
+          <span className="text-gray-300">Z (m):</span>
           <span className="font-mono">{coordinates.z}</span>
         </div>
       </div>
