@@ -67,7 +67,8 @@ export default function App() {
               <MapPanel
                 modelFile={modelFile}
                 layers={layers}
-                deployMode={deployMode} // soldier deploy mode flag
+                deployMode={deployMode}
+                setDeployMode={setDeployMode} // Pass setDeployMode
               />
             </div>
           </Panel>

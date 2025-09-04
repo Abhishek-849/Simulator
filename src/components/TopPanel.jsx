@@ -22,7 +22,7 @@ import {
   Users
 } from "lucide-react";
 
-export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier }) {
+export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier, deployMode }) {
   const [openMenu, setOpenMenu] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -225,7 +225,7 @@ export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier 
           {/* Deploy Soldier Menu */}
           <button
             onClick={onDeploySoldier}
-            className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${deployMode ? 'bg-blue-500 hover:bg-blue-600' : 'hover:bg-gray-800'}`}
           >
             <Users size={16} />
             <span className="text-sm">Deploy Soldier</span>

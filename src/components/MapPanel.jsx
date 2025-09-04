@@ -1,26 +1,17 @@
-import { useState, useEffect, useRef, Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Stats, TransformControls } from "@react-three/drei";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { OrbitControls, Stats, DragControls } from "@react-three/drei";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 
 // Soldier model (simple cube for now)
-function Soldier({ position, onTransform }) {
+function Soldier({ position, index }) {
   return (
-    <TransformControls
-      mode="translate"
-      position={position}
-      onObjectChange={(e) => {
-        const pos = e.target.object.position;
-        onTransform([pos.x, pos.y, pos.z]);
-      }}
-    >
-      <mesh>
-        <boxGeometry args={[0.2, 0.5, 0.2]} />
-        <meshStandardMaterial color="green" />
-      </mesh>
-    </TransformControls>
+    <mesh position={position} userData={{ index }}>
+      <boxGeometry args={[0.2, 0.5, 0.2]} />
+      <meshStandardMaterial color="green" />
+    </mesh>
   );
 }
 
@@ -58,11 +49,121 @@ function Model({ url, layerId, visible, onPointerMove }) {
 }
 
 // Scene setup
-function Scene({ layers, setCoordinates, deployMode, soldiers, setSoldiers }) {
+function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, setSoldiers }) {
+  const { camera, gl, scene } = useThree();
+  const terrainRef = useRef();
+  const planeRef = useRef();
+  const soldiersRef = useRef([]);
+  const dragControlsRef = useRef();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const mouse = useMemo(() => new THREE.Vector2(), []);
+  const [previewPosition, setPreviewPosition] = useState(null);
+
+  // Sync soldier refs with soldiers array
   useEffect(() => {
-    // Reset camera when layers change
-    // (OrbitControls auto-handles lookAt)
-  }, [layers]);
+    soldiersRef.current = soldiersRef.current.slice(0, soldiers.length);
+  }, [soldiers]);
+
+  // Handle mouse move for preview marker
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      if (!deployMode) return;
+
+      const rect = gl.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      const terrainObjects = terrainRef.current ? terrainRef.current.children : [];
+      const objectsToIntersect = [...terrainObjects, planeRef.current].filter(Boolean);
+
+      const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        // Optional: Adjust position to sit on surface (e.g., offset by half soldier height)
+        point.y += 0.25; // Assuming soldier height is 0.5, place bottom at surface
+        setPreviewPosition([point.x, point.y, point.z]);
+      } else {
+        setPreviewPosition(null);
+      }
+    };
+
+    gl.domElement.addEventListener("pointermove", handlePointerMove);
+    return () => gl.domElement.removeEventListener("pointermove", handlePointerMove);
+  }, [deployMode, gl, camera, raycaster, mouse]);
+
+  // Handle click to place soldier
+  useEffect(() => {
+    const handleClick = (event) => {
+      if (!deployMode || !previewPosition) return;
+
+      setSoldiers((prev) => [...prev, [...previewPosition]]);
+      setPreviewPosition(null);
+      setDeployMode(false); // Exit deploy mode after placing
+    };
+
+    gl.domElement.addEventListener("click", handleClick);
+    return () => gl.domElement.removeEventListener("click", handleClick);
+  }, [deployMode, previewPosition, setSoldiers, setDeployMode]);
+
+  // Update cursor based on deploy mode
+  useEffect(() => {
+    gl.domElement.style.cursor = deployMode ? "crosshair" : "auto";
+    return () => {
+      gl.domElement.style.cursor = "auto";
+    };
+  }, [deployMode, gl]);
+
+  // Handle soldier dragging
+  useEffect(() => {
+    const controls = dragControlsRef.current;
+    if (!controls) return;
+
+    const handleDrag = (event) => {
+      // Project dragged position onto terrain or plane
+      raycaster.setFromCamera(mouse, camera);
+      const terrainObjects = terrainRef.current ? terrainRef.current.children : [];
+      const objectsToIntersect = [...terrainObjects, planeRef.current].filter(Boolean);
+      const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        point.y += 0.25; // Adjust for soldier height
+        event.object.position.set(point.x, point.y, point.z);
+      }
+    };
+
+    const handleDragEnd = (event) => {
+      const idx = event.object.userData.index;
+      const p = event.object.position;
+      setSoldiers((prev) => {
+        const newSoldiers = [...prev];
+        newSoldiers[idx] = [p.x, p.y, p.z];
+        return newSoldiers;
+      });
+    };
+
+    controls.addEventListener("drag", handleDrag);
+    controls.addEventListener("dragend", handleDragEnd);
+    return () => {
+      controls.removeEventListener("drag", handleDrag);
+      controls.removeEventListener("dragend", handleDragEnd);
+    };
+  }, [dragControlsRef, setSoldiers, raycaster, mouse, camera]);
+
+  // Update mouse position for dragging
+  useEffect(() => {
+    const handleMouseMove = (event) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    };
+
+    gl.domElement.addEventListener("mousemove", handleMouseMove);
+    return () => gl.domElement.removeEventListener("mousemove", handleMouseMove);
+  }, [gl]);
 
   return (
     <>
@@ -70,61 +171,62 @@ function Scene({ layers, setCoordinates, deployMode, soldiers, setSoldiers }) {
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
+      {/* Ground plane for fallback placement */}
+      <mesh ref={planeRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} visible={false}>
+        <planeGeometry args={[100, 100]} />
+        <meshBasicMaterial />
+      </mesh>
+
       {/* Models */}
-      {layers.length > 0 ? (
-        layers.map((layer) =>
-          layer.fileUrl ? (
-            <Suspense key={layer.id} fallback={null}>
-              <Model
-                url={layer.fileUrl}
-                layerId={layer.id}
-                visible={layer.visible}
-                onPointerMove={setCoordinates}
-              />
-            </Suspense>
-          ) : null
-        )
-      ) : (
-        <mesh>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="hotpink" />
-        </mesh>
-      )}
+      <group ref={terrainRef}>
+        {layers.length > 0 ? (
+          layers.map((layer) =>
+            layer.fileUrl ? (
+              <Suspense key={layer.id} fallback={null}>
+                <Model
+                  url={layer.fileUrl}
+                  layerId={layer.id}
+                  visible={layer.visible}
+                  onPointerMove={setCoordinates}
+                />
+              </Suspense>
+            ) : null
+          )
+        ) : (
+          <mesh>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshStandardMaterial color="hotpink" />
+          </mesh>
+        )}
+      </group>
 
       {/* Soldiers */}
       {soldiers.map((pos, idx) => (
         <Soldier
           key={idx}
           position={pos}
-          onTransform={(newPos) => {
-            const updated = [...soldiers];
-            updated[idx] = newPos;
-            setSoldiers(updated);
-          }}
+          index={idx}
+          ref={(el) => (soldiersRef.current[idx] = el)}
         />
       ))}
 
-      <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
-      <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
+      <DragControls ref={dragControlsRef} objects={soldiersRef.current} />
 
-      {/* Placement plane for new soldiers */}
-      {deployMode && (
-        <mesh
-          onClick={(e) => {
-            e.stopPropagation();
-            const newPos = [e.point.x, e.point.y, e.point.z];
-            setSoldiers((prev) => [...prev, newPos]);
-          }}
-        >
-          <planeGeometry args={[100, 100]} />
-          <meshBasicMaterial transparent opacity={0} />
+      {/* Preview soldier */}
+      {deployMode && previewPosition && (
+        <mesh position={previewPosition}>
+          <boxGeometry args={[0.2, 0.5, 0.2]} />
+          <meshStandardMaterial color="blue" opacity={0.5} transparent />
         </mesh>
       )}
+
+      <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
+      <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
     </>
   );
 }
 
-export default function MapPanel({ layers = [], deployMode }) {
+export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0, z: 0 });
@@ -176,6 +278,7 @@ export default function MapPanel({ layers = [], deployMode }) {
           layers={layers}
           setCoordinates={setCoordinates}
           deployMode={deployMode}
+          setDeployMode={setDeployMode}
           soldiers={soldiers}
           setSoldiers={setSoldiers}
         />
