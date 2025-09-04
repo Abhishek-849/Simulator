@@ -1,4 +1,3 @@
-// src/components/TopPanel.jsx
 import { useState, useRef } from "react";
 import {
   FileText,
@@ -19,10 +18,11 @@ import {
   ZoomOut,
   EyeOff,
   Layers,
-  Plus
+  Plus,
+  Users
 } from "lucide-react";
 
-export default function TopPanel({ onModelSelect,onClearScene }) {
+export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier }) {
   const [openMenu, setOpenMenu] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -84,13 +84,12 @@ export default function TopPanel({ onModelSelect,onClearScene }) {
                   <Save size={16} /> Save Project
                 </button>
                 <div className="border-t border-gray-700 my-1"></div>
-                      <button
-                         onClick={() => window.location.reload()}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                      >
-                        Clear Scene
-                      </button>
-
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                >
+                  Clear Scene
+                </button>
               </div>
             )}
           </div>
@@ -222,6 +221,15 @@ export default function TopPanel({ onModelSelect,onClearScene }) {
               </div>
             )}
           </div>
+
+          {/* Deploy Soldier Menu */}
+          <button
+            onClick={onDeploySoldier}
+            className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
+          >
+            <Users size={16} />
+            <span className="text-sm">Deploy Soldier</span>
+          </button>
         </div>
 
         {/* Spacer */}
@@ -240,7 +248,6 @@ export default function TopPanel({ onModelSelect,onClearScene }) {
             <option>Recon</option>
             <option>Route Plan</option>
           </select>
-
         </div>
       </div>
 
