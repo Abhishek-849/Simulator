@@ -375,12 +375,15 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
         </div>
       </div>
 
-      {/* Soldiers count indicator */}
+      {/* Debug information for terrain intersection */}
       {soldiers.length > 0 && (
         <div className="absolute top-4 left-4 z-50 bg-green-900/80 text-white text-sm px-3 py-2 rounded-md shadow-lg">
           <span>Soldiers Deployed: {soldiers.length}</span>
           <div className="text-xs mt-1 opacity-75">
             Click and drag soldiers to reposition
+          </div>
+          <div className="text-xs mt-1 opacity-75">
+            Terrain layers: {layers.filter(l => l.visible).length}
           </div>
         </div>
       )}
