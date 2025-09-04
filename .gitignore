@@ -23,4 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 /venv
-/3d model
+server/uploads/
+3d model/
+*.obj
