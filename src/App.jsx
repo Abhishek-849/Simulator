@@ -15,6 +15,8 @@ export default function App() {
     vehicles: 0,
     tanks: 0,
   });
+  const [items, setItems] = useState([]); // Deployed items state lifted up
+  const [sceneClearTrigger, setSceneClearTrigger] = useState(0); // Used to trigger remounting
 
   const handleModelSelect = (file) => {
     if (file === null) {
@@ -36,7 +38,9 @@ export default function App() {
   };
 
   const clearScene = () => {
+    // Clear 3D model layers and increment trigger to force MapPanel remount
     handleModelSelect(null);
+    setSceneClearTrigger(prev => prev + 1);
   };
 
   const resetMissionDetails = () => {
@@ -55,6 +59,9 @@ export default function App() {
         onClearScene={clearScene}
         setMissionDetails={setMissionDetails}
         resetMissionDetails={resetMissionDetails}
+        items={items}
+        layers={layers}
+        missionDetails={missionDetails}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -87,12 +94,15 @@ export default function App() {
           <Panel defaultSize={80} minSize={60} className="flex flex-col">
             <div className="h-full w-full bg-gray-50">
               <MapPanel
+                key={sceneClearTrigger}
                 modelFile={modelFile}
                 layers={layers}
                 deployMode={deployMode}
                 setDeployMode={setDeployMode}
                 missionDetails={missionDetails}
                 setMissionDetails={setMissionDetails}
+                items={items}
+                setItems={setItems}
               />
             </div>
           </Panel>

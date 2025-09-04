@@ -1,13 +1,13 @@
 // src/components/MapPanel.jsx
 import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Stats } from "@react-three/drei";
+import { OrbitControls, Stats, Html } from "@react-three/drei";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 
 // Draggable Item component with manual drag implementation
-function DraggableItem({ position, index, type, onPositionChange, terrainRef, planeRef }) {
+function DraggableItem({ position, index, type, onPositionChange, onRepositionRequest, terrainRef, planeRef }) {
   const { camera, gl } = useThree();
   const groupRef = useRef();
   const [isDragging, setIsDragging] = useState(false);
@@ -17,9 +17,19 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
 
   const handlePointerDown = (event) => {
     event.stopPropagation();
-    setIsDragging(true);
-    gl.domElement.style.cursor = 'grabbing';
-    console.log(`Starting drag for ${type} ${index}`);
+
+    // If model is locked and item exists, show confirmation first
+    if (!isDragging && typeof onRepositionRequest === 'function') {
+      onRepositionRequest(index, type);
+      return; // Don't start dragging yet, wait for confirmation
+    }
+
+    // Start dragging normally (for unlocked states or when confirmed)
+    if (!isDragging) {
+      setIsDragging(true);
+      gl.domElement.style.cursor = 'grabbing';
+      console.log(`Starting drag for ${type} ${index}`);
+    }
   };
 
   const handleGlobalPointerMove = (event) => {
@@ -38,8 +48,12 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
     
     if (intersects.length > 0) {
-      const point = intersects[0].point;
-      point.y += type === 'troops' ? 0.09375 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1; // Adjust offset for each type
+      const point = intersects[0].point.clone();
+      // Calculate proper surface offset based on item type and geometry
+      const surfaceOffset = type === 'troops' ? 0.09375 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1;
+      
+      // Position item directly on the surface with minimal offset
+      point.y = intersects[0].point.y + surfaceOffset;
       groupRef.current.position.set(point.x, point.y, point.z);
     }
   };
@@ -69,6 +83,9 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
       };
     }
   }, [isDragging, handleGlobalPointerMove, handleGlobalPointerUp]);
+
+  // Define impact circle radius based on type
+  const impactRadius = type === 'troops' ? 0.3 : type === 'arsenal' ? 0.6 : type === 'vehicles' ? 0.6 : 1.0; // tanks get largest radius
 
   // Define geometry and material based on type
   const geometry = type === 'troops' ? (
@@ -109,6 +126,19 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
     </mesh>
   );
 
+  // Impact circle component
+  const impactCircle = (
+    <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[impactRadius * 0.8, impactRadius, 32]} />
+      <meshBasicMaterial 
+        color="red" 
+        transparent 
+        opacity={isHovered || isDragging ? 0.4 : 0.2}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+
   return (
     <group 
       ref={groupRef}
@@ -126,6 +156,8 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
         }
       }}
     >
+      {/* Impact circle - rendered first so it appears underneath */}
+      {impactCircle}
       {geometry}
       {/* Larger invisible collision mesh for easier interaction */}
       <mesh position={[0, type === 'troops' ? 0.125 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1, 0]} visible={false}>
@@ -169,8 +201,71 @@ function Model({ url, layerId, visible, onPointerMove }) {
   ) : null;
 }
 
+// Image Processing Component - renders distance with line connecting points
+function DistanceLine({ start, end, calculateDistance }) {
+  // Calculate the distance for line positioning
+  const distance = calculateDistance(start, end);
+
+  // Calculate rotation and position for the line
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dz = end.z - start.z;
+  const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+  // Create line geometry points
+  const points = [
+    new THREE.Vector3(start.x, start.y + 0.05, start.z),
+    new THREE.Vector3(end.x, end.y + 0.05, end.z)
+  ];
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+  return (
+    <group key={`distance-line-${start.x}-${start.y}-${end.x}-${end.y}`}>
+      {/* Starting point marker */}
+      <mesh position={[start.x, start.y + 0.1, start.z]}>
+        <sphereGeometry args={[0.03, 16, 16]} />
+        <meshStandardMaterial color="yellow" emissive="yellow" emissiveIntensity={0.2} />
+      </mesh>
+
+      {/* End point marker */}
+      <mesh position={[end.x, end.y + 0.1, end.z]}>
+        <sphereGeometry args={[0.03, 16, 16]} />
+        <meshStandardMaterial color="yellow" emissive="yellow" emissiveIntensity={0.2} />
+      </mesh>
+
+      {/* Distance line connecting the points */}
+      <line geometry={geometry}>
+        <lineBasicMaterial color="yellow" linewidth={5} />
+      </line>
+
+      {/* Distance label */}
+      <Html
+        position={[(start.x + end.x) / 2, Math.max(start.y, end.y) + 0.3, (start.z + end.z) / 2]}
+        center
+      >
+        <div
+          style={{
+            background: 'rgba(255, 255, 0, 0.9)',
+            color: 'black',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            whiteSpace: 'nowrap',
+            fontWeight: 'bold',
+            border: '2px solid yellow',
+            boxShadow: '2px 2px 8px rgba(0,0,0,0.5)'
+          }}
+        >
+          {distance.toFixed(2)}m
+        </div>
+      </Html>
+    </group>
+  );
+}
+
 // Scene setup
-function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails }) {
+function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, handleRepositionRequest, distanceMode, distancePoints, calculateDistance }) {
   const { camera, gl, scene } = useThree();
   const terrainRef = useRef();
   const planeRef = useRef();
@@ -179,6 +274,55 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
   const mouse = useMemo(() => new THREE.Vector2(), []);
   const [previewPosition, setPreviewPosition] = useState(null);
   const [isDraggingItem, setIsDraggingItem] = useState(false);
+
+  // Handle distance measurement clicks (must be at Scene level to access canvas DOM)
+  useEffect(() => {
+    if (!distanceMode || !distanceMode.active) return;
+
+    const handleDistanceClick = (event) => {
+      event.stopPropagation();
+
+      const rect = gl.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2();
+
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // Create raycaster for terrain intersection
+      raycaster.setFromCamera(mouse, camera);
+
+      // Get terrain objects for intersection
+      const terrainObjects = terrainRef.current ? terrainRef.current.children : [];
+      const objectsToIntersect = [...terrainObjects, planeRef.current].filter(Boolean);
+
+      const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point.clone();
+
+        // Convert to world coordinates as expected by distance calculation
+        const worldPoint = {
+          x: point.x,
+          y: point.y,
+          z: point.z,
+          screenCoords: { x: event.clientX - rect.left, y: event.clientY - rect.top }
+        };
+
+        // Add point to distancePoints array (but we can't modify state from here)
+        // Instead, dispatch an event to parent component
+        const customEvent = new CustomEvent('distancePointSelected', {
+          detail: { point: worldPoint }
+        });
+        window.dispatchEvent(customEvent);
+      }
+    };
+
+    gl.domElement.addEventListener('click', handleDistanceClick);
+
+    return () => {
+      gl.domElement.removeEventListener('click', handleDistanceClick);
+    };
+  }, [distanceMode, gl, camera, raycaster, terrainRef, planeRef]);
 
   // Handle mouse move for preview marker
   useEffect(() => {
@@ -197,8 +341,12 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
       const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
       if (intersects.length > 0) {
-        const point = intersects[0].point;
-        point.y += deployMode.type === 'troops' ? 0.09375 : deployMode.type === 'arsenal' ? 0.05 : deployMode.type === 'vehicles' ? 0.075 : 0.1;
+        const point = intersects[0].point.clone();
+        // Calculate proper surface offset based on item type and geometry
+        const surfaceOffset = deployMode.type === 'troops' ? 0.09375 : deployMode.type === 'arsenal' ? 0.05 : deployMode.type === 'vehicles' ? 0.075 : 0.1;
+        
+        // Position item directly on the surface with minimal offset
+        point.y = intersects[0].point.y + surfaceOffset;
         setPreviewPosition([point.x, point.y, point.z]);
       } else {
         setPreviewPosition(null);
@@ -212,11 +360,24 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
   // Handle click to place item
   useEffect(() => {
     const handleClick = (event) => {
+      // Don't handle clicks when distance mode is active - let distance tool handle it
+      if (distanceMode && distanceMode.active) return;
+
       if (!deployMode.active || !previewPosition || isDraggingItem || missionDetails[deployMode.type] === 0) return;
 
-      setItems((prev) => [...prev, { position: [...previewPosition], type: deployMode.type }]);
+      // Add the new item to the scene
+      const newItems = [...items, { position: [...previewPosition], type: deployMode.type }];
+      setItems(newItems);
+
+      // Update mission details
       setMissionDetails((prev) => ({ ...prev, [deployMode.type]: prev[deployMode.type] - 1 }));
       setPreviewPosition(null);
+
+      // Lock the model position when the first item is deployed on the model
+      if (layers.length > 0 && items.length === 0) { // Only lock on first item
+        setModelLocked?.(true);
+      }
+
       if (missionDetails[deployMode.type] - 1 === 0) {
         setDeployMode({ active: false, type: null });
       }
@@ -224,7 +385,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
 
     gl.domElement.addEventListener("click", handleClick);
     return () => gl.domElement.removeEventListener("click", handleClick);
-  }, [deployMode, previewPosition, isDraggingItem, setItems, setDeployMode, missionDetails, setMissionDetails]);
+  }, [deployMode, previewPosition, isDraggingItem, setItems, setDeployMode, missionDetails, setMissionDetails, setModelLocked, items.length, layers.length, distanceMode]);
 
   // Update cursor based on deploy mode
   useEffect(() => {
@@ -260,9 +421,17 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
     });
   }, [items]);
 
+  // Preview impact circle radius based on type
+  const previewImpactRadius = deployMode.type === 'troops' ? 0.3 : deployMode.type === 'arsenal' ? 0.6 : deployMode.type === 'vehicles' ? 0.6 : 1.0;
+
   // Preview geometry based on type
   const previewGeometry = deployMode.type === 'troops' ? (
     <>
+      {/* Preview impact circle */}
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
+        <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
       <mesh position={[0, 0.09375, 0]}>
         <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
@@ -273,20 +442,41 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
       </mesh>
     </>
   ) : deployMode.type === 'arsenal' ? (
-    <mesh position={[0, 0.05, 0]}>
-      <boxGeometry args={[0.1, 0.1, 0.1]} />
-      <meshStandardMaterial color="blue" opacity={0.5} transparent />
-    </mesh>
+    <>
+      {/* Preview impact circle */}
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
+        <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 0.05, 0]}>
+        <boxGeometry args={[0.1, 0.1, 0.1]} />
+        <meshStandardMaterial color="blue" opacity={0.5} transparent />
+      </mesh>
+    </>
   ) : deployMode.type === 'vehicles' ? (
-    <mesh position={[0, 0.075, 0]}>
-      <boxGeometry args={[0.15, 0.15, 0.15]} />
-      <meshStandardMaterial color="blue" opacity={0.5} transparent />
-    </mesh>
+    <>
+      {/* Preview impact circle */}
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
+        <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 0.075, 0]}>
+        <boxGeometry args={[0.15, 0.15, 0.15]} />
+        <meshStandardMaterial color="blue" opacity={0.5} transparent />
+      </mesh>
+    </>
   ) : (
-    <mesh position={[0, 0.1, 0]}>
-      <cylinderGeometry args={[0.05, 0.05, 0.2, 32]} />
-      <meshStandardMaterial color="blue" opacity={0.5} transparent />
-    </mesh>
+    <>
+      {/* Preview impact circle */}
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
+        <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 0.1, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.2, 32]} />
+        <meshStandardMaterial color="blue" opacity={0.5} transparent />
+      </mesh>
+    </>
   );
 
   return (
@@ -295,8 +485,8 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
-      {/* Ground plane for fallback placement */}
-      <mesh ref={planeRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} visible={false}>
+      {/* Ground plane for fallback placement - positioned lower to avoid interference */}
+      <mesh ref={planeRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]} visible={false}>
         <planeGeometry args={[100, 100]} />
         <meshBasicMaterial />
       </mesh>
@@ -332,6 +522,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
           index={idx}
           type={item.type}
           onPositionChange={handleItemPositionChange}
+          onRepositionRequest={handleRepositionRequest}
           terrainRef={terrainRef}
           planeRef={planeRef}
         />
@@ -344,11 +535,20 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
         </group>
       )}
 
+      {/* Distance measurement line */}
+      {distanceMode.active && distancePoints.length >= 2 && (
+        <DistanceLine
+          start={distancePoints[0]}
+          end={distancePoints[1]}
+          calculateDistance={calculateDistance}
+        />
+      )}
+
       <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
-      <OrbitControls 
-        ref={orbitRef} 
-        enablePan={true} 
-        enableZoom={true} 
+      <OrbitControls
+        ref={orbitRef}
+        enablePan={true}
+        enableZoom={true}
         enableRotate={true}
         enabled={!isDraggingItem} // Disable when dragging items
       />
@@ -356,12 +556,152 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
   );
 }
 
-export default function MapPanel({ layers = [], deployMode, setDeployMode, missionDetails, setMissionDetails }) {
+// Confirmation dialog component for repositioning items
+function ConfirmationDialog({ isOpen, onClose, onConfirm, message }) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] pointer-events-auto"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white p-6 rounded-lg shadow-lg w-96 max-w-[90vw]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold mb-4 text-gray-800">
+          Confirm Repositioning
+        </h2>
+        <p className="text-gray-700 mb-6">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-blue-500 text-blue-100 rounded hover:bg-blue-600 transition-colors"
+          >
+            Reposition
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function MapPanel({ layers = [], deployMode, setDeployMode, missionDetails, setMissionDetails, items, setItems }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0, z: 0 });
-  const [items, setItems] = useState([]);
+  const [confirmationDialog, setConfirmationDialog] = useState({ isOpen: false, itemIndex: -1, type: '' });
   const canvasRef = useRef();
+  const [modelLocked, setModelLocked] = useState(false);
+  const [distanceMode, setDistanceMode] = useState({ active: false });
+  const [distancePoints, setDistancePoints] = useState([]);
+
+  // Listen for distance tool activation
+  useEffect(() => {
+    const handleStartDistanceTool = () => {
+      setDistanceMode({ active: true });
+      setDistancePoints([]); // Reset points when tool is activated
+      console.log("Distance tool activated");
+    };
+
+    window.addEventListener('startDistanceTool', handleStartDistanceTool);
+
+    return () => {
+      window.removeEventListener('startDistanceTool', handleStartDistanceTool);
+    };
+  }, []);
+
+  // Listen for distance point selection from Scene component
+  useEffect(() => {
+    const handleDistancePointSelected = (event) => {
+      const { point } = event.detail;
+      console.log("Distance point selected:", point);
+
+      const newPoints = [...distancePoints, point];
+      setDistancePoints(newPoints);
+
+      // If we have 2 points, create the elevation profile
+      if (newPoints.length === 2) {
+        const elevationData = sampleElevationAlongLine(newPoints[0], newPoints[1]);
+        window.dispatchEvent(new CustomEvent('elevationProfileUpdate', {
+          detail: elevationData
+        }));
+        console.log("Elevation profile generated");
+
+        // Deactivate distance mode after 2 points
+        setDistanceMode({ active: false });
+      }
+    };
+
+    window.addEventListener('distancePointSelected', handleDistancePointSelected);
+
+    return () => {
+      window.removeEventListener('distancePointSelected', handleDistancePointSelected);
+    };
+  }, [distancePoints]);
+
+  // Helper function to calculate distance between two points
+  const calculateDistance = (point1, point2) => {
+    return Math.sqrt(
+      Math.pow(point2.x - point1.x, 2) +
+      Math.pow(point2.y - point1.y, 2) +
+      Math.pow(point2.z - point1.z, 2)
+    );
+  };
+
+  // Sample elevation points along the line
+  const sampleElevationAlongLine = (startPoint, endPoint, numSamples = 50) => {
+    const points = [];
+    const distance = calculateDistance(startPoint, endPoint);
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / (numSamples - 1);
+      const x = startPoint.x + (endPoint.x - startPoint.x) * t;
+      const y = startPoint.y + (endPoint.y - startPoint.y) * t;
+      const z = startPoint.z + (endPoint.z - startPoint.z) * t;
+
+      const elevation = Math.max(y, startPoint.y, endPoint.y); // Simplified elevation, in reality this would sample terrain
+
+      points.push({
+        position: i,
+        distance: distance * t,
+        elevation: elevation,
+        worldPosition: { x, y, z }
+      });
+    }
+
+    return { points, distance };
+  };
+
+
+
+  // Handle repositioning request
+  const handleRepositionRequest = (index, type) => {
+    if (modelLocked && layers.length > 0) {
+      setConfirmationDialog({
+        isOpen: true,
+        itemIndex: index,
+        type: type
+      });
+    }
+  };
+
+  // Handle confirmation dialog close
+  const closeConfirmationDialog = () => {
+    setConfirmationDialog({ isOpen: false, itemIndex: -1, type: '' });
+  };
+
+  // Handle confirmation of repositioning
+  const confirmRepositioning = () => {
+    setModelLocked(false);
+    setConfirmationDialog({ isOpen: false, itemIndex: -1, type: '' });
+  };
 
   useEffect(() => {
     const uploadModel = async (layer) => {
@@ -413,6 +753,11 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
           setItems={setItems}
           missionDetails={missionDetails}
           setMissionDetails={setMissionDetails}
+          setModelLocked={setModelLocked}
+          handleRepositionRequest={handleRepositionRequest}
+          distanceMode={distanceMode}
+          distancePoints={distancePoints}
+          calculateDistance={calculateDistance}
         />
       </Canvas>
 
@@ -443,6 +788,19 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
         </div>
       )}
 
+      {/* Distance Mode Visual Feedback */}
+      {distanceMode.active && (
+        <div className="absolute top-16 left-4 z-50 bg-yellow-600/90 text-white text-sm px-4 py-2 rounded-md shadow-lg border-2 border-yellow-400">
+          <div className="font-bold">Distance Tool Active</div>
+          <div className="text-xs mt-1 opacity-90">
+            Click on terrain to select points
+          </div>
+          <div className="text-xs opacity-75">
+            Points selected: {distancePoints.length}/2
+          </div>
+        </div>
+      )}
+
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-40">
           <div className="text-white text-lg">
@@ -456,6 +814,14 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
           {error}
         </div>
       )}
+
+      {/* Confirmation Dialog for repositioning */}
+      <ConfirmationDialog
+        isOpen={confirmationDialog.isOpen}
+        onClose={closeConfirmationDialog}
+        onConfirm={confirmRepositioning}
+        message={`Do you want to reposition this ${confirmationDialog.type}? The 3D model will be unlocked for repositioning.`}
+      />
     </div>
   );
 }

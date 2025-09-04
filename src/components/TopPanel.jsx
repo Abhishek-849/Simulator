@@ -20,7 +20,7 @@ import {
   Map,
 } from "lucide-react";
 
-export default function TopPanel({ onModelSelect, onClearScene, setMissionDetails, resetMissionDetails }) {
+export default function TopPanel({ onModelSelect, onClearScene, setMissionDetails, resetMissionDetails, items = [], layers = [], missionDetails = {} }) {
   const [openMenu, setOpenMenu] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -86,6 +86,175 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
     setIsModalOpen(false);
   };
 
+  const saveMission = async () => {
+    if (items.length === 0) {
+      alert('No deployed items to save. Please deploy troops, arsenal, vehicles, or tanks first.');
+      return;
+    }
+
+    try {
+      // Generate OBJ content including deployed items
+      let objContent = '# Mission Plan OBJ File\n';
+      let vertexCount = 0;
+
+      // Get current timestamp for filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `mission-plan-${timestamp}.obj`;
+
+      // Build OBJ content from items
+      items.forEach((item, index) => {
+        const [x, y, z] = item.position;
+        const scale = item.type === 'troops' ? 0.03 : item.type === 'arsenal' ? 0.04 : item.type === 'vehicles' ? 0.08 : 0.12;
+
+        // Create different geometries based on item type
+        let geometryData;
+        switch (item.type) {
+          case 'troops':
+            // Simple cylinder for troops
+            geometryData = {
+              vertices: [
+                [0, scale, 0],      // v1
+                [scale, 0, 0],      // v2
+                [-scale, 0, 0],     // v3
+                [0, -scale, 0],     // v4
+              ],
+              faces: [[1, 2, 3], [1, 3, 4], [1, 4, 2], [2, 4, 3]]
+            };
+            break;
+          case 'arsenal':
+            // Box for arsenal
+            geometryData = {
+              vertices: [
+                [-scale, -scale, -scale], // v1
+                [scale, -scale, -scale],  // v2
+                [scale, scale, -scale],   // v3
+                [-scale, scale, -scale],  // v4
+                [-scale, -scale, scale],  // v5
+                [scale, -scale, scale],   // v6
+                [scale, scale, scale],    // v7
+                [-scale, scale, scale],   // v8
+              ],
+              faces: [
+                [1, 2, 3, 4], [5, 8, 7, 6], // bottom/top
+                [1, 4, 8, 5], [2, 6, 7, 3], // sides
+                [1, 5, 6, 2], [4, 3, 7, 8]  // front/back
+              ]
+            };
+            break;
+          case 'vehicles':
+            // Longer box for vehicles
+            geometryData = {
+              vertices: [
+                [-scale*1.5, -scale, -scale/2], // v1
+                [scale*1.5, -scale, -scale/2],  // v2
+                [scale*1.5, scale, -scale/2],   // v3
+                [-scale*1.5, scale, -scale/2],  // v4
+                [-scale*1.5, -scale, scale/2],  // v5
+                [scale*1.5, -scale, scale/2],   // v6
+                [scale*1.5, scale, scale/2],    // v7
+                [-scale*1.5, scale, scale/2],   // v8
+              ],
+              faces: [
+                [1, 2, 3, 4], [5, 8, 7, 6], // bottom/top
+                [1, 4, 8, 5], [2, 6, 7, 3], // sides
+                [1, 5, 6, 2], [4, 3, 7, 8]  // front/back
+              ]
+            };
+            break;
+          case 'tanks':
+            // Large box for tanks
+            geometryData = {
+              vertices: [
+                [-scale, -scale, -scale*1.2], // v1
+                [scale, -scale, -scale*1.2],  // v2
+                [scale, scale, -scale*1.2],   // v3
+                [-scale, scale, -scale*1.2],  // v4
+                [-scale, -scale, scale],      // v5
+                [scale, -scale, scale],       // v6
+                [scale, scale, scale],        // v7
+                [-scale, scale, scale],       // v8
+              ],
+              faces: [
+                [1, 2, 3, 4], [5, 8, 7, 6], // bottom/top
+                [1, 4, 8, 5], [2, 6, 7, 3], // sides
+                [1, 5, 6, 2], [4, 3, 7, 8]  // front/back
+              ]
+            };
+            break;
+          default:
+            return; // Skip unknown types
+        }
+
+        // Add vertices with position translation
+        geometryData.vertices.forEach(([vx, vy, vz]) => {
+          objContent += `v ${x + vx} ${y + vy - 0.05} ${z + vz}\n`; // Subtract small offset for ground placement
+          vertexCount++;
+        });
+
+        // Add faces (OBJ face indices are 1-based)
+        const baseIndex = vertexCount - geometryData.vertices.length;
+        geometryData.faces.forEach(face => {
+          const faceStr = face.map(idx => idx + baseIndex).join(' ');
+          objContent += `f ${faceStr}\n`;
+        });
+
+        // Add material group
+        objContent += `g ${item.type}-${index + 1}\n`;
+        objContent += `\n`;
+      });
+
+      // Create mission summary comment
+      const totalItems = items.length;
+      const assetSummary = Object.entries(
+        items.reduce((acc, item) => {
+          acc[item.type] = (acc[item.type] || 0) + 1;
+          return acc;
+        }, {})
+      ).map(([type, count]) => `${count} ${type}`).join(', ');
+
+      objContent = `# Mission Plan - Assets: ${assetSummary} (Total: ${totalItems})\n` +
+                   `# Generated: ${new Date().toISOString()}\n` +
+                   `# Mission Details: Troops: ${missionDetails.troops}, Arsenal: ${missionDetails.arsenal}, Vehicles: ${missionDetails.vehicles}, Tanks: ${missionDetails.tanks}\n\n` +
+                   objContent;
+
+      // Send OBJ content to backend for saving
+      const response = await fetch('http://localhost:5000/save-mission', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename,
+          content: objContent,
+          missionInfo: {
+            totalAssets: totalItems,
+            assetBreakdown: items.reduce((acc, item) => {
+              acc[item.type] = (acc[item.type] || 0) + 1;
+              return acc;
+            }, {}),
+            missionDetails,
+            generatedAt: new Date().toISOString(),
+            terrainModel: layers.find(l => l.type === 'model')?.name || 'No terrain loaded'
+          }
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ Mission saved successfully!\n\n📁 File: ${result.filename}\n📍 Location: ${result.path}\n📊 Assets: ${totalItems}`);
+      } else {
+        throw new Error(result.error || 'Unknown error occurred');
+      }
+
+    } catch (error) {
+      console.error('Error saving mission:', error);
+      alert(`❌ Error saving mission: ${error.message}`);
+    }
+
+    setOpenMenu(null);
+  };
+
   return (
     <div className="bg-gray-900 text-white relative z-50 shadow-sm">
       <div className="flex items-center space-x-6 p-3">
@@ -113,8 +282,11 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
                 >
                   <FolderOpen size={16} /> Open 3D Model
                 </button>
-                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
-                  <Save size={16} /> Save Project
+                <button
+                  onClick={saveMission}
+                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+                >
+                  <Save size={16} /> Save Mission
                 </button>
                 <div className="border-t border-gray-700 my-1"></div>
                 <button
@@ -206,7 +378,13 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
             {openMenu === "tools" && (
               <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700 p-1">
                 <div className="text-xs text-gray-400 px-3 py-1">Measurements</div>
-                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('startDistanceTool'));
+                    setOpenMenu(null);
+                  }}
+                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+                >
                   <Ruler size={16} /> Distance
                 </button>
                 <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">

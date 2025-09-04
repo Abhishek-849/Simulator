@@ -26,3 +26,4 @@ dist-ssr
 server/uploads/
 3d model/
 *.obj
+server/mission-files/
