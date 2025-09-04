@@ -100,82 +100,76 @@ export default function SidePanel({ layers = [], onLayersChange, missionDetails,
         ) : (
           <div className="p-4">
             <h3 className="text-sm font-semibold mb-4">Mission Details</h3>
-            {missionDetails.troops === 0 && missionDetails.arsenal === 0 && missionDetails.vehicles === 0 && missionDetails.tanks === 0 ? (
-              <div className="text-center py-8 text-sm text-gray-500">
-                No mission details set. Click "Plan Mission" in the top panel to start.
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2 flex-1">
+                  <Cylinder size={16} className="text-gray-600" />
+                  <span className="text-sm text-gray-700">Troops: {missionDetails.troops}</span>
+                </div>
+                <button
+                  onClick={() => setDeployMode({ active: true, type: 'troops' })}
+                  disabled={missionDetails.troops === 0}
+                  className={`w-28 py-1 px-3 rounded text-sm font-medium text-center transition-colors ${
+                    missionDetails.troops === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Deploy Troops
+                </button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Cylinder size={16} className="text-gray-600" />
-                    <span className="text-sm text-gray-700">Troops: {missionDetails.troops}</span>
-                  </div>
-                  <button
-                    onClick={() => setDeployMode({ active: true, type: 'troops' })}
-                    disabled={missionDetails.troops === 0}
-                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
-                      missionDetails.troops === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    Deploy Troops
-                  </button>
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2 flex-1">
+                  <Box size={16} className="text-gray-600" />
+                  <span className="text-sm text-gray-700">Arsenal: {missionDetails.arsenal}</span>
                 </div>
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Box size={16} className="text-gray-600" />
-                    <span className="text-sm text-gray-700">Arsenal: {missionDetails.arsenal}</span>
-                  </div>
-                  <button
-                    onClick={() => setDeployMode({ active: true, type: 'arsenal' })}
-                    disabled={missionDetails.arsenal === 0}
-                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
-                      missionDetails.arsenal === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    Deploy Arsenal
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Truck size={16} className="text-gray-600" />
-                    <span className="text-sm text-gray-700">Vehicles: {missionDetails.vehicles}</span>
-                  </div>
-                  <button
-                    onClick={() => setDeployMode({ active: true, type: 'vehicles' })}
-                    disabled={missionDetails.vehicles === 0}
-                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
-                      missionDetails.vehicles === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    Deploy Vehicles
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield size={16} className="text-gray-600" />
-                    <span className="text-sm text-gray-700">Tanks: {missionDetails.tanks}</span>
-                  </div>
-                  <button
-                    onClick={() => setDeployMode({ active: true, type: 'tanks' })}
-                    disabled={missionDetails.tanks === 0}
-                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
-                      missionDetails.tanks === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    Deploy Tanks
-                  </button>
-                </div>
+                <button
+                  onClick={() => setDeployMode({ active: true, type: 'arsenal' })}
+                  disabled={missionDetails.arsenal === 0}
+                  className={`w-28 py-1 px-3 rounded text-sm font-medium text-center transition-colors ${
+                    missionDetails.arsenal === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Deploy Arsenal
+                </button>
               </div>
-            )}
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2 flex-1">
+                  <Truck size={16} className="text-gray-600" />
+                  <span className="text-sm text-gray-700">Vehicles: {missionDetails.vehicles}</span>
+                </div>
+                <button
+                  onClick={() => setDeployMode({ active: true, type: 'vehicles' })}
+                  disabled={missionDetails.vehicles === 0}
+                  className={`w-28 py-1 px-3 rounded text-sm font-medium text-center transition-colors ${
+                    missionDetails.vehicles === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Deploy Vehicles
+                </button>
+              </div>
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2 flex-1">
+                  <Shield size={16} className="text-gray-600" />
+                  <span className="text-sm text-gray-700">Tanks: {missionDetails.tanks}</span>
+                </div>
+                <button
+                  onClick={() => setDeployMode({ active: true, type: 'tanks' })}
+                  disabled={missionDetails.tanks === 0}
+                  className={`w-28 py-1 px-3 rounded text-sm font-medium text-center transition-colors ${
+                    missionDetails.tanks === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Deploy Tanks
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
