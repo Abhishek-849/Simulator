@@ -1,10 +1,10 @@
+// src/components/TopPanel.jsx
 import { useState, useRef } from "react";
 import {
   FileText,
   Eye,
   FolderOpen,
   Save,
-  Trash2,
   Grid,
   Compass,
   Info,
@@ -12,18 +12,23 @@ import {
   Rotate3D,
   Ruler,
   MapPinned,
-  Copy,
-  Scissors,
   ZoomIn,
   ZoomOut,
   EyeOff,
   Layers,
   Plus,
-  Users
+  Map,
 } from "lucide-react";
 
-export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier, deployMode }) {
+export default function TopPanel({ onModelSelect, onClearScene, setMissionDetails, resetMissionDetails }) {
   const [openMenu, setOpenMenu] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    troops: "",
+    arsenal: "",
+    vehicles: "",
+    tanks: "",
+  });
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (event) => {
@@ -51,6 +56,34 @@ export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier,
 
   const toggleMenu = (menu) => {
     setOpenMenu(openMenu === menu ? null : menu);
+  };
+
+  const handleModalOpen = () => {
+    setIsModalOpen(true);
+    setFormData({ troops: "", arsenal: "", vehicles: "", tanks: "" });
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    resetMissionDetails();
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (/^\d*$/.test(value)) { // Allow only non-negative integers
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleModalSubmit = () => {
+    const details = {
+      troops: parseInt(formData.troops) || 0,
+      arsenal: parseInt(formData.arsenal) || 0,
+      vehicles: parseInt(formData.vehicles) || 0,
+      tanks: parseInt(formData.tanks) || 0,
+    };
+    setMissionDetails(details);
+    setIsModalOpen(false);
   };
 
   return (
@@ -85,8 +118,8 @@ export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier,
                 </button>
                 <div className="border-t border-gray-700 my-1"></div>
                 <button
-                  onClick={() => window.location.reload()}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  onClick={handleClearScene}
+                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
                 >
                   Clear Scene
                 </button>
@@ -94,28 +127,15 @@ export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier,
             )}
           </div>
 
-          {/* Edit Menu */}
+          {/* Plan Mission Button */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("edit")}
+              onClick={handleModalOpen}
               className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <Copy size={16} />
-              <span className="text-sm">Edit</span>
+              <Map size={16} />
+              <span className="text-sm">Plan Mission</span>
             </button>
-            {openMenu === "edit" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Copy size={14} /> Copy
-                </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Scissors size={14} /> Cut
-                </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Trash2 size={14} /> Delete
-                </button>
-              </div>
-            )}
           </div>
 
           {/* View Menu */}
@@ -221,15 +241,6 @@ export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier,
               </div>
             )}
           </div>
-
-          {/* Deploy Soldier Menu */}
-          <button
-            onClick={onDeploySoldier}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${deployMode ? 'bg-blue-500 hover:bg-blue-600' : 'hover:bg-gray-800'}`}
-          >
-            <Users size={16} />
-            <span className="text-sm">Deploy Soldier</span>
-          </button>
         </div>
 
         {/* Spacer */}
@@ -259,6 +270,75 @@ export default function TopPanel({ onModelSelect, onClearScene, onDeploySoldier,
         onChange={handleFileSelect}
         className="hidden"
       />
+
+      {/* Mission Planning Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Mission Details</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Troops</label>
+                <input
+                  type="text"
+                  name="troops"
+                  value={formData.troops}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded text-sm bg-white text-black placeholder-gray-400"
+                  placeholder="Enter number of troops"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Arsenal</label>
+                <input
+                  type="text"
+                  name="arsenal"
+                  value={formData.arsenal}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded text-sm bg-white text-black placeholder-gray-400"
+                  placeholder="Enter number of arsenal"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Vehicles</label>
+                <input
+                  type="text"
+                  name="vehicles"
+                  value={formData.vehicles}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded text-sm bg-white text-black placeholder-gray-400"
+                  placeholder="Enter number of vehicles"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Tanks</label>
+                <input
+                  type="text"
+                  name="tanks"
+                  value={formData.tanks}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded text-sm bg-white text-black placeholder-gray-400"
+                  placeholder="Enter number of tanks"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={handleModalClose}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleModalSubmit}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

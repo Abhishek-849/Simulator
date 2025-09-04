@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useState } from "react";
 import TopPanel from "./components/TopPanel";
 import SidePanel from "./components/SidePanel";
@@ -7,7 +8,13 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 export default function App() {
   const [modelFile, setModelFile] = useState(null);
   const [layers, setLayers] = useState([]);
-  const [deployMode, setDeployMode] = useState(false); // soldier deploy mode toggle
+  const [deployMode, setDeployMode] = useState(false); // Soldier deploy mode toggle
+  const [missionDetails, setMissionDetails] = useState({
+    troops: 0,
+    arsenal: 0,
+    vehicles: 0,
+    tanks: 0,
+  });
 
   const handleModelSelect = (file) => {
     if (file === null) {
@@ -32,13 +39,22 @@ export default function App() {
     handleModelSelect(null);
   };
 
+  const resetMissionDetails = () => {
+    setMissionDetails({
+      troops: 0,
+      arsenal: 0,
+      vehicles: 0,
+      tanks: 0,
+    });
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-100">
       <TopPanel
         onModelSelect={handleModelSelect}
         onClearScene={clearScene}
-        onDeploySoldier={() => setDeployMode(!deployMode)} // toggle soldier mode
-        deployMode={deployMode}
+        setMissionDetails={setMissionDetails}
+        resetMissionDetails={resetMissionDetails}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -54,7 +70,13 @@ export default function App() {
               <h2 className="font-semibold text-gray-700">Layers</h2>
             </div>
             <div className="flex-1 overflow-auto">
-              <SidePanel layers={layers} onLayersChange={setLayers} />
+              <SidePanel
+                layers={layers}
+                onLayersChange={setLayers}
+                missionDetails={missionDetails}
+                setMissionDetails={setMissionDetails}
+                setDeployMode={setDeployMode}
+              />
             </div>
           </Panel>
 
@@ -68,7 +90,9 @@ export default function App() {
                 modelFile={modelFile}
                 layers={layers}
                 deployMode={deployMode}
-                setDeployMode={setDeployMode} // Pass setDeployMode
+                setDeployMode={setDeployMode}
+                missionDetails={missionDetails}
+                setMissionDetails={setMissionDetails}
               />
             </div>
           </Panel>

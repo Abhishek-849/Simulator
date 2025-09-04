@@ -1,8 +1,8 @@
 // src/components/SidePanel.jsx
 import { useState } from 'react';
-import { Eye, EyeOff, GripVertical, Settings, Trash2, Box, Ruler, Layers } from 'lucide-react';
+import { Eye, EyeOff, GripVertical, Trash2, Layers, Cylinder, Box, Truck, Shield } from 'lucide-react';
 
-export default function SidePanel({ layers = [], onLayersChange }) {
+export default function SidePanel({ layers = [], onLayersChange, missionDetails, setDeployMode }) {
   const [activeTab, setActiveTab] = useState('layers');
   const [selectedLayer, setSelectedLayer] = useState(null);
 
@@ -35,12 +35,12 @@ export default function SidePanel({ layers = [], onLayersChange }) {
           </div>
         </button>
         <button
-          onClick={() => setActiveTab('properties')}
-          className={`flex-1 py-2 px-4 text-sm font-medium ${activeTab === 'properties' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('mission')}
+          className={`flex-1 py-2 px-4 text-sm font-medium ${activeTab === 'mission' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
         >
           <div className="flex items-center justify-center gap-2">
-            <Settings size={16} />
-            <span>Properties</span>
+            <Box size={16} />
+            <span>Mission Details</span>
           </div>
         </button>
       </div>
@@ -99,65 +99,81 @@ export default function SidePanel({ layers = [], onLayersChange }) {
           </div>
         ) : (
           <div className="p-4">
-            {selectedLayer ? (
-              <div>
-                <h3 className="text-sm font-semibold mb-4">Layer Properties</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-                    <input
-                      type="text"
-                      value={selectedLayer.name}
-                      onChange={(e) => {
-                        const updatedLayers = layers.map(layer => 
-                          layer.id === selectedLayer.id 
-                            ? { ...layer, name: e.target.value } 
-                            : layer
-                        );
-                        onLayersChange?.(updatedLayers);
-                        setSelectedLayer({ ...selectedLayer, name: e.target.value });
-                      }}
-                      className="w-full p-2 text-sm border border-gray-300 rounded"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="flex items-center text-xs font-medium text-gray-700 mb-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedLayer.visible}
-                        onChange={(e) => {
-                          const updatedLayers = layers.map(layer => 
-                            layer.id === selectedLayer.id 
-                              ? { ...layer, visible: e.target.checked } 
-                              : layer
-                          );
-                          onLayersChange?.(updatedLayers);
-                          setSelectedLayer({ ...selectedLayer, visible: e.target.checked });
-                        }}
-                        className="mr-2"
-                      />
-                      Visible
-                    </label>
-                  </div>
-                  
-                  {selectedLayer.type === 'model' && (
-                    <div>
-                      <h4 className="text-xs font-medium text-gray-700 mb-2 flex items-center">
-                        <Box className="mr-1" size={14} />
-                        3D Model
-                      </h4>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <div>Type: {selectedLayer.file?.type || 'N/A'}</div>
-                        <div>Size: {selectedLayer.file?.size ? (selectedLayer.file.size / 1024).toFixed(2) + ' KB' : 'N/A'}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+            <h3 className="text-sm font-semibold mb-4">Mission Details</h3>
+            {missionDetails.troops === 0 && missionDetails.arsenal === 0 && missionDetails.vehicles === 0 && missionDetails.tanks === 0 ? (
+              <div className="text-center py-8 text-sm text-gray-500">
+                No mission details set. Click "Plan Mission" in the top panel to start.
               </div>
             ) : (
-              <div className="text-center py-8 text-sm text-gray-500">
-                Select a layer to view and edit its properties.
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cylinder size={16} className="text-gray-600" />
+                    <span className="text-sm text-gray-700">Troops: {missionDetails.troops}</span>
+                  </div>
+                  <button
+                    onClick={() => setDeployMode({ active: true, type: 'troops' })}
+                    disabled={missionDetails.troops === 0}
+                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
+                      missionDetails.troops === 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    Deploy Troops
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Box size={16} className="text-gray-600" />
+                    <span className="text-sm text-gray-700">Arsenal: {missionDetails.arsenal}</span>
+                  </div>
+                  <button
+                    onClick={() => setDeployMode({ active: true, type: 'arsenal' })}
+                    disabled={missionDetails.arsenal === 0}
+                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
+                      missionDetails.arsenal === 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    Deploy Arsenal
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Truck size={16} className="text-gray-600" />
+                    <span className="text-sm text-gray-700">Vehicles: {missionDetails.vehicles}</span>
+                  </div>
+                  <button
+                    onClick={() => setDeployMode({ active: true, type: 'vehicles' })}
+                    disabled={missionDetails.vehicles === 0}
+                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
+                      missionDetails.vehicles === 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    Deploy Vehicles
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield size={16} className="text-gray-600" />
+                    <span className="text-sm text-gray-700">Tanks: {missionDetails.tanks}</span>
+                  </div>
+                  <button
+                    onClick={() => setDeployMode({ active: true, type: 'tanks' })}
+                    disabled={missionDetails.tanks === 0}
+                    className={`py-1 px-3 rounded text-sm font-medium transition-colors ${
+                      missionDetails.tanks === 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    Deploy Tanks
+                  </button>
+                </div>
               </div>
             )}
           </div>

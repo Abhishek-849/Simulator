@@ -1,3 +1,4 @@
+// src/components/MapPanel.jsx
 import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Stats } from "@react-three/drei";
@@ -5,8 +6,8 @@ import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 
-// Draggable Soldier component with manual drag implementation
-function DraggableSoldier({ position, index, onPositionChange, terrainRef, planeRef }) {
+// Draggable Item component with manual drag implementation
+function DraggableItem({ position, index, type, onPositionChange, terrainRef, planeRef }) {
   const { camera, gl } = useThree();
   const groupRef = useRef();
   const [isDragging, setIsDragging] = useState(false);
@@ -18,7 +19,7 @@ function DraggableSoldier({ position, index, onPositionChange, terrainRef, plane
     event.stopPropagation();
     setIsDragging(true);
     gl.domElement.style.cursor = 'grabbing';
-    console.log(`Starting drag for soldier ${index}`);
+    console.log(`Starting drag for ${type} ${index}`);
   };
 
   const handleGlobalPointerMove = (event) => {
@@ -38,7 +39,7 @@ function DraggableSoldier({ position, index, onPositionChange, terrainRef, plane
     
     if (intersects.length > 0) {
       const point = intersects[0].point;
-      point.y += 0.09375; // Offset by half body height
+      point.y += type === 'troops' ? 0.09375 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1; // Adjust offset for each type
       groupRef.current.position.set(point.x, point.y, point.z);
     }
   };
@@ -48,11 +49,11 @@ function DraggableSoldier({ position, index, onPositionChange, terrainRef, plane
     
     setIsDragging(false);
     gl.domElement.style.cursor = isHovered ? 'pointer' : 'auto';
-    console.log(`Ending drag for soldier ${index}`);
+    console.log(`Ending drag for ${type} ${index}`);
     
     // Update position in parent component
     const pos = groupRef.current.position;
-    onPositionChange(index, [pos.x, pos.y, pos.z]);
+    onPositionChange(index, { position: [pos.x, pos.y, pos.z], type });
   };
 
   // Add global event listeners for drag
@@ -69,11 +70,50 @@ function DraggableSoldier({ position, index, onPositionChange, terrainRef, plane
     }
   }, [isDragging, handleGlobalPointerMove, handleGlobalPointerUp]);
 
+  // Define geometry and material based on type
+  const geometry = type === 'troops' ? (
+    <>
+      <mesh position={[0, 0.09375, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
+        <meshStandardMaterial 
+          color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
+        />
+      </mesh>
+      <mesh position={[0, 0.20625, 0]}>
+        <sphereGeometry args={[0.01875, 32, 32]} />
+        <meshStandardMaterial 
+          color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
+        />
+      </mesh>
+    </>
+  ) : type === 'arsenal' ? (
+    <mesh position={[0, 0.05, 0]}>
+      <boxGeometry args={[0.1, 0.1, 0.1]} />
+      <meshStandardMaterial 
+        color={isDragging ? "lightblue" : isHovered ? "darkblue" : "blue"} 
+      />
+    </mesh>
+  ) : type === 'vehicles' ? (
+    <mesh position={[0, 0.075, 0]}>
+      <boxGeometry args={[0.15, 0.15, 0.15]} />
+      <meshStandardMaterial 
+        color={isDragging ? "yellow" : isHovered ? "goldenrod" : "orange"} 
+      />
+    </mesh>
+  ) : (
+    <mesh position={[0, 0.1, 0]}>
+      <cylinderGeometry args={[0.05, 0.05, 0.2, 32]} />
+      <meshStandardMaterial 
+        color={isDragging ? "salmon" : isHovered ? "darkred" : "red"} 
+      />
+    </mesh>
+  );
+
   return (
     <group 
       ref={groupRef}
       position={position} 
-      userData={{ index }}
+      userData={{ index, type }}
       onPointerDown={handlePointerDown}
       onPointerEnter={() => {
         setIsHovered(true);
@@ -86,23 +126,10 @@ function DraggableSoldier({ position, index, onPositionChange, terrainRef, plane
         }
       }}
     >
-      {/* Body */}
-      <mesh position={[0, 0.09375, 0]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
-        <meshStandardMaterial 
-          color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
-        />
-      </mesh>
-      {/* Head */}
-      <mesh position={[0, 0.20625, 0]}>
-        <sphereGeometry args={[0.01875, 32, 32]} />
-        <meshStandardMaterial 
-          color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
-        />
-      </mesh>
+      {geometry}
       {/* Larger invisible collision mesh for easier interaction */}
-      <mesh position={[0, 0.125, 0]} visible={false}>
-        <cylinderGeometry args={[0.06, 0.06, 0.3, 8]} />
+      <mesh position={[0, type === 'troops' ? 0.125 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1, 0]} visible={false}>
+        <boxGeometry args={[0.12, 0.3, 0.12]} />
         <meshBasicMaterial />
       </mesh>
     </group>
@@ -143,7 +170,7 @@ function Model({ url, layerId, visible, onPointerMove }) {
 }
 
 // Scene setup
-function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, setSoldiers }) {
+function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails }) {
   const { camera, gl, scene } = useThree();
   const terrainRef = useRef();
   const planeRef = useRef();
@@ -151,12 +178,12 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const mouse = useMemo(() => new THREE.Vector2(), []);
   const [previewPosition, setPreviewPosition] = useState(null);
-  const [isDraggingSoldier, setIsDraggingSoldier] = useState(false);
+  const [isDraggingItem, setIsDraggingItem] = useState(false);
 
   // Handle mouse move for preview marker
   useEffect(() => {
     const handlePointerMove = (event) => {
-      if (!deployMode || isDraggingSoldier) return;
+      if (!deployMode.active || isDraggingItem || missionDetails[deployMode.type] === 0) return;
 
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -171,7 +198,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        point.y += 0.09375; // Offset by half body height (0.1875 / 2)
+        point.y += deployMode.type === 'troops' ? 0.09375 : deployMode.type === 'arsenal' ? 0.05 : deployMode.type === 'vehicles' ? 0.075 : 0.1;
         setPreviewPosition([point.x, point.y, point.z]);
       } else {
         setPreviewPosition(null);
@@ -180,55 +207,87 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
     gl.domElement.addEventListener("pointermove", handlePointerMove);
     return () => gl.domElement.removeEventListener("pointermove", handlePointerMove);
-  }, [deployMode, isDraggingSoldier, gl, camera, raycaster, mouse]);
+  }, [deployMode, isDraggingItem, gl, camera, raycaster, mouse, missionDetails]);
 
-  // Handle click to place soldier
+  // Handle click to place item
   useEffect(() => {
     const handleClick = (event) => {
-      if (!deployMode || !previewPosition || isDraggingSoldier) return;
+      if (!deployMode.active || !previewPosition || isDraggingItem || missionDetails[deployMode.type] === 0) return;
 
-      setSoldiers((prev) => [...prev, [...previewPosition]]);
+      setItems((prev) => [...prev, { position: [...previewPosition], type: deployMode.type }]);
+      setMissionDetails((prev) => ({ ...prev, [deployMode.type]: prev[deployMode.type] - 1 }));
       setPreviewPosition(null);
-      setDeployMode(false); // Exit deploy mode after placing
+      if (missionDetails[deployMode.type] - 1 === 0) {
+        setDeployMode({ active: false, type: null });
+      }
     };
 
     gl.domElement.addEventListener("click", handleClick);
     return () => gl.domElement.removeEventListener("click", handleClick);
-  }, [deployMode, previewPosition, isDraggingSoldier, setSoldiers, setDeployMode]);
+  }, [deployMode, previewPosition, isDraggingItem, setItems, setDeployMode, missionDetails, setMissionDetails]);
 
   // Update cursor based on deploy mode
   useEffect(() => {
-    if (!isDraggingSoldier) {
-      gl.domElement.style.cursor = deployMode ? "crosshair" : "auto";
+    if (!isDraggingItem) {
+      gl.domElement.style.cursor = deployMode.active && missionDetails[deployMode.type] > 0 ? "crosshair" : "auto";
     }
     return () => {
-      if (!isDraggingSoldier) {
+      if (!isDraggingItem) {
         gl.domElement.style.cursor = "auto";
       }
     };
-  }, [deployMode, isDraggingSoldier, gl]);
+  }, [deployMode, isDraggingItem, gl, missionDetails]);
 
-  // Handle soldier position updates
-  const handleSoldierPositionChange = (index, newPosition) => {
-    setSoldiers((prev) => {
-      const newSoldiers = [...prev];
-      if (index < newSoldiers.length) {
-        newSoldiers[index] = newPosition;
+  // Handle item position updates
+  const handleItemPositionChange = (index, { position, type }) => {
+    setItems((prev) => {
+      const newItems = [...prev];
+      if (index < newItems.length) {
+        newItems[index] = { position, type };
       }
-      return newSoldiers;
+      return newItems;
     });
   };
 
-  // Track when any soldier is being dragged
+  // Track when any item is being dragged
   useEffect(() => {
-    const handleDragStart = () => setIsDraggingSoldier(true);
-    const handleDragEnd = () => setIsDraggingSoldier(false);
+    const handleDragStart = () => setIsDraggingItem(true);
+    const handleDragEnd = () => setIsDraggingItem(false);
 
-    // Listen for soldier drag events
-    soldiers.forEach((_, index) => {
-      // This is handled within each soldier component
+    // Listen for item drag events
+    items.forEach((_, index) => {
+      // This is handled within each item component
     });
-  }, [soldiers]);
+  }, [items]);
+
+  // Preview geometry based on type
+  const previewGeometry = deployMode.type === 'troops' ? (
+    <>
+      <mesh position={[0, 0.09375, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
+        <meshStandardMaterial color="blue" opacity={0.5} transparent />
+      </mesh>
+      <mesh position={[0, 0.20625, 0]}>
+        <sphereGeometry args={[0.01875, 32, 32]} />
+        <meshStandardMaterial color="blue" opacity={0.5} transparent />
+      </mesh>
+    </>
+  ) : deployMode.type === 'arsenal' ? (
+    <mesh position={[0, 0.05, 0]}>
+      <boxGeometry args={[0.1, 0.1, 0.1]} />
+      <meshStandardMaterial color="blue" opacity={0.5} transparent />
+    </mesh>
+  ) : deployMode.type === 'vehicles' ? (
+    <mesh position={[0, 0.075, 0]}>
+      <boxGeometry args={[0.15, 0.15, 0.15]} />
+      <meshStandardMaterial color="blue" opacity={0.5} transparent />
+    </mesh>
+  ) : (
+    <mesh position={[0, 0.1, 0]}>
+      <cylinderGeometry args={[0.05, 0.05, 0.2, 32]} />
+      <meshStandardMaterial color="blue" opacity={0.5} transparent />
+    </mesh>
+  );
 
   return (
     <>
@@ -265,29 +324,23 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
         )}
       </group>
 
-      {/* Draggable Soldiers */}
-      {soldiers.map((pos, idx) => (
-        <DraggableSoldier
+      {/* Draggable Items */}
+      {items.map((item, idx) => (
+        <DraggableItem
           key={idx}
-          position={pos}
+          position={item.position}
           index={idx}
-          onPositionChange={handleSoldierPositionChange}
+          type={item.type}
+          onPositionChange={handleItemPositionChange}
           terrainRef={terrainRef}
           planeRef={planeRef}
         />
       ))}
 
-      {/* Preview soldier - matches soldier geometry */}
-      {deployMode && previewPosition && !isDraggingSoldier && (
+      {/* Preview item */}
+      {deployMode.active && previewPosition && !isDraggingItem && missionDetails[deployMode.type] > 0 && (
         <group position={previewPosition}>
-          <mesh position={[0, 0.09375, 0]}>
-            <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
-            <meshStandardMaterial color="blue" opacity={0.5} transparent />
-          </mesh>
-          <mesh position={[0, 0.20625, 0]}>
-            <sphereGeometry args={[0.01875, 32, 32]} />
-            <meshStandardMaterial color="blue" opacity={0.5} transparent />
-          </mesh>
+          {previewGeometry}
         </group>
       )}
 
@@ -297,17 +350,17 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
         enablePan={true} 
         enableZoom={true} 
         enableRotate={true}
-        enabled={!isDraggingSoldier} // Disable when dragging soldiers
+        enabled={!isDraggingItem} // Disable when dragging items
       />
     </>
   );
 }
 
-export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
+export default function MapPanel({ layers = [], deployMode, setDeployMode, missionDetails, setMissionDetails }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0, z: 0 });
-  const [soldiers, setSoldiers] = useState([]);
+  const [items, setItems] = useState([]);
   const canvasRef = useRef();
 
   useEffect(() => {
@@ -356,8 +409,10 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
           setCoordinates={setCoordinates}
           deployMode={deployMode}
           setDeployMode={setDeployMode}
-          soldiers={soldiers}
-          setSoldiers={setSoldiers}
+          items={items}
+          setItems={setItems}
+          missionDetails={missionDetails}
+          setMissionDetails={setMissionDetails}
         />
       </Canvas>
 
@@ -376,11 +431,11 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
       </div>
 
       {/* Debug information for terrain intersection */}
-      {soldiers.length > 0 && (
+      {items.length > 0 && (
         <div className="absolute top-4 left-4 z-50 bg-green-900/80 text-white text-sm px-3 py-2 rounded-md shadow-lg">
-          <span>Soldiers Deployed: {soldiers.length}</span>
+          <span>Items Deployed: {items.length}</span>
           <div className="text-xs mt-1 opacity-75">
-            Click and drag soldiers to reposition
+            Click and drag items to reposition
           </div>
           <div className="text-xs mt-1 opacity-75">
             Terrain layers: {layers.filter(l => l.visible).length}
