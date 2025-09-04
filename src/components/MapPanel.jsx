@@ -1,30 +1,113 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Stats, DragControls } from "@react-three/drei";
+import { OrbitControls, Stats } from "@react-three/drei";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 
-// Soldier model (cylinder body + sphere head, 25% of previous size)
-function Soldier({ position, index }, ref) {
+// Draggable Soldier component with manual drag implementation
+function DraggableSoldier({ position, index, onPositionChange, terrainRef, planeRef }) {
+  const { camera, gl } = useThree();
+  const groupRef = useRef();
+  const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const mouse = useMemo(() => new THREE.Vector2(), []);
+
+  const handlePointerDown = (event) => {
+    event.stopPropagation();
+    setIsDragging(true);
+    gl.domElement.style.cursor = 'grabbing';
+    console.log(`Starting drag for soldier ${index}`);
+  };
+
+  const handleGlobalPointerMove = (event) => {
+    if (!isDragging) return;
+
+    const rect = gl.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Get terrain objects for intersection
+    const terrainObjects = terrainRef.current ? terrainRef.current.children : [];
+    const objectsToIntersect = [...terrainObjects, planeRef.current].filter(Boolean);
+    
+    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
+    
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+      point.y += 0.09375; // Offset by half body height
+      groupRef.current.position.set(point.x, point.y, point.z);
+    }
+  };
+
+  const handleGlobalPointerUp = () => {
+    if (!isDragging) return;
+    
+    setIsDragging(false);
+    gl.domElement.style.cursor = isHovered ? 'pointer' : 'auto';
+    console.log(`Ending drag for soldier ${index}`);
+    
+    // Update position in parent component
+    const pos = groupRef.current.position;
+    onPositionChange(index, [pos.x, pos.y, pos.z]);
+  };
+
+  // Add global event listeners for drag
+  useEffect(() => {
+    if (isDragging) {
+      const canvas = gl.domElement;
+      canvas.addEventListener('pointermove', handleGlobalPointerMove);
+      canvas.addEventListener('pointerup', handleGlobalPointerUp);
+      
+      return () => {
+        canvas.removeEventListener('pointermove', handleGlobalPointerMove);
+        canvas.removeEventListener('pointerup', handleGlobalPointerUp);
+      };
+    }
+  }, [isDragging, handleGlobalPointerMove, handleGlobalPointerUp]);
+
   return (
-    <group position={position} userData={{ index }} ref={ref}>
-      {/* Body: ~0.1875 units tall, 0.05 units wide */}
+    <group 
+      ref={groupRef}
+      position={position} 
+      userData={{ index }}
+      onPointerDown={handlePointerDown}
+      onPointerEnter={() => {
+        setIsHovered(true);
+        gl.domElement.style.cursor = 'pointer';
+      }}
+      onPointerLeave={() => {
+        setIsHovered(false);
+        if (!isDragging) {
+          gl.domElement.style.cursor = 'auto';
+        }
+      }}
+    >
+      {/* Body */}
       <mesh position={[0, 0.09375, 0]}>
         <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
-        <meshStandardMaterial color="green" />
+        <meshStandardMaterial 
+          color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
+        />
       </mesh>
-      {/* Head: ~0.0375 units diameter, positioned above body */}
+      {/* Head */}
       <mesh position={[0, 0.20625, 0]}>
         <sphereGeometry args={[0.01875, 32, 32]} />
-        <meshStandardMaterial color="green" />
+        <meshStandardMaterial 
+          color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
+        />
+      </mesh>
+      {/* Larger invisible collision mesh for easier interaction */}
+      <mesh position={[0, 0.125, 0]} visible={false}>
+        <cylinderGeometry args={[0.06, 0.06, 0.3, 8]} />
+        <meshBasicMaterial />
       </mesh>
     </group>
   );
 }
-
-// Forward ref to Soldier component for DragControls
-const SoldierWithRef = React.forwardRef(Soldier);
 
 // 3D Model Component
 function Model({ url, layerId, visible, onPointerMove }) {
@@ -64,22 +147,16 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
   const { camera, gl, scene } = useThree();
   const terrainRef = useRef();
   const planeRef = useRef();
-  const soldiersRef = useRef([]);
-  const dragControlsRef = useRef();
   const orbitRef = useRef();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const mouse = useMemo(() => new THREE.Vector2(), []);
   const [previewPosition, setPreviewPosition] = useState(null);
-
-  // Sync soldier refs with soldiers array
-  useEffect(() => {
-    soldiersRef.current = soldiersRef.current.slice(0, soldiers.length);
-  }, [soldiers]);
+  const [isDraggingSoldier, setIsDraggingSoldier] = useState(false);
 
   // Handle mouse move for preview marker
   useEffect(() => {
     const handlePointerMove = (event) => {
-      if (!deployMode) return;
+      if (!deployMode || isDraggingSoldier) return;
 
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -103,12 +180,12 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
     gl.domElement.addEventListener("pointermove", handlePointerMove);
     return () => gl.domElement.removeEventListener("pointermove", handlePointerMove);
-  }, [deployMode, gl, camera, raycaster, mouse]);
+  }, [deployMode, isDraggingSoldier, gl, camera, raycaster, mouse]);
 
   // Handle click to place soldier
   useEffect(() => {
     const handleClick = (event) => {
-      if (!deployMode || !previewPosition) return;
+      if (!deployMode || !previewPosition || isDraggingSoldier) return;
 
       setSoldiers((prev) => [...prev, [...previewPosition]]);
       setPreviewPosition(null);
@@ -117,72 +194,41 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
 
     gl.domElement.addEventListener("click", handleClick);
     return () => gl.domElement.removeEventListener("click", handleClick);
-  }, [deployMode, previewPosition, setSoldiers, setDeployMode]);
+  }, [deployMode, previewPosition, isDraggingSoldier, setSoldiers, setDeployMode]);
 
   // Update cursor based on deploy mode
   useEffect(() => {
-    gl.domElement.style.cursor = deployMode ? "crosshair" : "auto";
+    if (!isDraggingSoldier) {
+      gl.domElement.style.cursor = deployMode ? "crosshair" : "auto";
+    }
     return () => {
-      gl.domElement.style.cursor = "auto";
-    };
-  }, [deployMode, gl]);
-
-  // Handle soldier dragging and disable OrbitControls during drag
-  useEffect(() => {
-    const controls = dragControlsRef.current;
-    const orbit = orbitRef.current;
-    if (!controls || !orbit) return;
-
-    const handleDragStart = () => {
-      orbit.enabled = false; // Disable OrbitControls during drag
-    };
-
-    const handleDrag = (event) => {
-      raycaster.setFromCamera(mouse, camera);
-      const terrainObjects = terrainRef.current ? terrainRef.current.children : [];
-      const objectsToIntersect = [...terrainObjects, planeRef.current].filter(Boolean);
-      const intersects = raycaster.intersectObjects(objectsToIntersect, true);
-
-      if (intersects.length > 0) {
-        const point = intersects[0].point;
-        point.y += 0.09375; // Offset by half body height
-        event.object.position.set(point.x, point.y, point.z);
+      if (!isDraggingSoldier) {
+        gl.domElement.style.cursor = "auto";
       }
     };
+  }, [deployMode, isDraggingSoldier, gl]);
 
-    const handleDragEnd = (event) => {
-      orbit.enabled = true; // Re-enable OrbitControls
-      const idx = event.object.userData.index;
-      const p = event.object.position;
-      setSoldiers((prev) => {
-        const newSoldiers = [...prev];
-        newSoldiers[idx] = [p.x, p.y, p.z];
-        return newSoldiers;
-      });
-    };
+  // Handle soldier position updates
+  const handleSoldierPositionChange = (index, newPosition) => {
+    setSoldiers((prev) => {
+      const newSoldiers = [...prev];
+      if (index < newSoldiers.length) {
+        newSoldiers[index] = newPosition;
+      }
+      return newSoldiers;
+    });
+  };
 
-    controls.addEventListener("dragstart", handleDragStart);
-    controls.addEventListener("drag", handleDrag);
-    controls.addEventListener("dragend", handleDragEnd);
-
-    return () => {
-      controls.removeEventListener("dragstart", handleDragStart);
-      controls.removeEventListener("drag", handleDrag);
-      controls.removeEventListener("dragend", handleDragEnd);
-    };
-  }, [dragControlsRef, orbitRef, setSoldiers, raycaster, mouse, camera]);
-
-  // Update mouse position for dragging
+  // Track when any soldier is being dragged
   useEffect(() => {
-    const handleMouseMove = (event) => {
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    };
+    const handleDragStart = () => setIsDraggingSoldier(true);
+    const handleDragEnd = () => setIsDraggingSoldier(false);
 
-    gl.domElement.addEventListener("mousemove", handleMouseMove);
-    return () => gl.domElement.removeEventListener("mousemove", handleMouseMove);
-  }, [gl]);
+    // Listen for soldier drag events
+    soldiers.forEach((_, index) => {
+      // This is handled within each soldier component
+    });
+  }, [soldiers]);
 
   return (
     <>
@@ -219,20 +265,20 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
         )}
       </group>
 
-      {/* Soldiers */}
+      {/* Draggable Soldiers */}
       {soldiers.map((pos, idx) => (
-        <SoldierWithRef
+        <DraggableSoldier
           key={idx}
           position={pos}
           index={idx}
-          ref={(el) => (soldiersRef.current[idx] = el)}
+          onPositionChange={handleSoldierPositionChange}
+          terrainRef={terrainRef}
+          planeRef={planeRef}
         />
       ))}
 
-      <DragControls ref={dragControlsRef} objects={soldiersRef.current} />
-
       {/* Preview soldier - matches soldier geometry */}
-      {deployMode && previewPosition && (
+      {deployMode && previewPosition && !isDraggingSoldier && (
         <group position={previewPosition}>
           <mesh position={[0, 0.09375, 0]}>
             <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
@@ -246,7 +292,13 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, soldiers, se
       )}
 
       <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
-      <OrbitControls ref={orbitRef} enablePan={true} enableZoom={true} enableRotate={true} />
+      <OrbitControls 
+        ref={orbitRef} 
+        enablePan={true} 
+        enableZoom={true} 
+        enableRotate={true}
+        enabled={!isDraggingSoldier} // Disable when dragging soldiers
+      />
     </>
   );
 }
@@ -322,6 +374,16 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode }) {
           <span className="font-mono">{coordinates.z}</span>
         </div>
       </div>
+
+      {/* Soldiers count indicator */}
+      {soldiers.length > 0 && (
+        <div className="absolute top-4 left-4 z-50 bg-green-900/80 text-white text-sm px-3 py-2 rounded-md shadow-lg">
+          <span>Soldiers Deployed: {soldiers.length}</span>
+          <div className="text-xs mt-1 opacity-75">
+            Click and drag soldiers to reposition
+          </div>
+        </div>
+      )}
 
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-40">
