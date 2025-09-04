@@ -55,5 +55,53 @@ def upload_file():
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
+@app.route('/save-mission', methods=['POST'])
+def save_mission():
+    try:
+        # Get JSON data from request
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Extract mission data
+        filename = data.get('filename')
+        content = data.get('content')
+        mission_info = data.get('missionInfo', {})
+
+        if not filename or not content:
+            return jsonify({"error": "Missing filename or content"}), 400
+
+        # Create a mission-specific folder in the root directory
+        mission_dir = os.path.join(os.getcwd(), "mission-files")
+        os.makedirs(mission_dir, exist_ok=True)
+
+        # Sanitize filename
+        secure_name = secure_filename(filename)
+
+        # Save the OBJ file
+        filepath = os.path.join(mission_dir, secure_name)
+        with open(filepath, 'w') as f:
+            f.write(content)
+
+        # Also save mission metadata as JSON
+        metadata_file = os.path.splitext(secure_name)[0] + '.json'
+        metadata_path = os.path.join(mission_dir, metadata_file)
+        with open(metadata_path, 'w') as f:
+            import json
+            json.dump(mission_info, f, indent=2, default=str)
+
+        return jsonify({
+            "success": True,
+            "filename": secure_name,
+            "path": filepath,
+            "metadata_file": metadata_file,
+            "message": "Mission saved successfully"
+        })
+
+    except Exception as e:
+        print(f"Error saving mission: {str(e)}")
+        return jsonify({"error": f"Failed to save mission: {str(e)}"}), 500
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
