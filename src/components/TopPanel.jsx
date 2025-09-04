@@ -1,56 +1,60 @@
 // src/components/TopPanel.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   FileText,
-  Edit2,
   Eye,
-  Layers,
-  Target,
-  MapPin,
   FolderOpen,
   Save,
-  Plus,
-  Copy,
-  Scissors,
   Trash2,
-  ZoomIn,
-  ZoomOut,
   Grid,
-  EyeOff,
-  Database,
   Compass,
   Info,
-  PlugZap,
+  Box,
+  Rotate3D,
+  Ruler,
+  MapPinned,
+  Copy,
+  Scissors,
+  ZoomIn,
+  ZoomOut,
+  EyeOff,
+  Layers,
+  Plus,
+  Target,
+  MapPin,
+  Database,
+  Edit2,
+  PlugZap
 } from "lucide-react";
 
-export default function TopPanel({onFileSelect,onTileLayerReady }) {
+export default function TopPanel({ onModelSelect }) {
   const [openMenu, setOpenMenu] = useState(null);
+  const fileInputRef = useRef(null);
 
-
-
-  const handleFileUpload = async (file) => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  try {
-    const response = await fetch("http://127.0.0.1:5000/process", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await response.json();
-
-    if (data.success) {
-      // Pass the tile layer URL down to MapPanel
-      if (props.onTileLayerReady) {
-        props.onTileLayerReady(data.tile_url);
-      }
-    } else {
-      alert("Backend error: " + data.error);
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check if file is .obj
+    if (!file.name.endsWith('.obj')) {
+      alert('Please select a .obj file');
+      return;
     }
-  } catch (err) {
-    console.error("Error uploading:", err);
-  }
-};
+    
+    // Pass the file to parent component
+    if (onModelSelect) {
+      onModelSelect(file);
+    }
+  };
+
+  const handleClearScene = () => {
+    if (window.confirm('Are you sure you want to clear the current scene?')) {
+      if (onModelSelect) {
+        onModelSelect(null);
+      }
+      setOpenMenu(null);
+    }
+  };
 
   const toggleMenu = (menu) => {
     setOpenMenu(openMenu === menu ? null : menu);
@@ -59,45 +63,54 @@ export default function TopPanel({onFileSelect,onTileLayerReady }) {
   return (
     <div className="bg-gray-900 text-white relative z-50 shadow-sm">
       <div className="flex items-center space-x-6 p-3">
-        <div className="text-lg font-semibold">Simulator Prototype</div>
+        <div className="flex items-center gap-2 text-lg font-semibold">
+          <Box size={20} className="text-blue-400" />
+          <span>3D Terrain Viewer</span>
+        </div>
 
         {/* Menu bar */}
         <div className="flex items-center gap-4">
-          {/* Project */}
+          {/* File Menu */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("Project")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
+              onClick={() => toggleMenu("file")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <FileText size={16} /> <span className="text-sm">Project</span>
+              <FileText size={16} />
+              <span className="text-sm">File</span>
             </button>
-            {openMenu === "Project" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Plus size={14} /> New
-                </button>
-                <button
-                  onClick={() => document.getElementById("tiffInput").click()}
-                  className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm"
+            {openMenu === "file" && (
+              <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700">
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
                 >
-                  <FolderOpen size={14} /> Open
+                  <FolderOpen size={16} /> Open 3D Model
                 </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Save size={14} /> Save
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Save size={16} /> Save Project
+                </button>
+                <div className="border-t border-gray-700 my-1"></div>
+                <button 
+                  onClick={handleClearScene}
+                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left text-red-400"
+                >
+                  <Trash2 size={16} /> Clear Scene
                 </button>
               </div>
             )}
           </div>
 
-          {/* Edit */}
+          {/* Edit Menu */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("Edit")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
+              onClick={() => toggleMenu("edit")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <Edit2 size={16} /> <span className="text-sm">Edit</span>
+              <Copy size={16} />
+              <span className="text-sm">Edit</span>
             </button>
-            {openMenu === "Edit" && (
+            {openMenu === "edit" && (
               <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
                 <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
                   <Copy size={14} /> Copy
@@ -112,144 +125,105 @@ export default function TopPanel({onFileSelect,onTileLayerReady }) {
             )}
           </div>
 
-          {/* View */}
+          {/* View Menu */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("View")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
+              onClick={() => toggleMenu("view")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <Eye size={16} /> <span className="text-sm">View</span>
+              <Eye size={16} />
+              <span className="text-sm">View</span>
             </button>
-            {openMenu === "View" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
+            {openMenu === "view" && (
+              <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700 p-1">
+                <div className="text-xs text-gray-400 px-3 py-1">Camera</div>
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Rotate3D size={16} /> Orbit Mode
+                </button>
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <MapPinned size={16} /> Top View
+                </button>
+                <div className="border-t border-gray-700 my-1"></div>
+                <div className="text-xs text-gray-400 px-3 py-1">Zoom</div>
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm">
                   <ZoomIn size={14} /> Zoom In
                 </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm">
                   <ZoomOut size={14} /> Zoom Out
                 </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <EyeOff size={14} /> Hide Grid
+                <div className="border-t border-gray-700 my-1"></div>
+                <div className="text-xs text-gray-400 px-3 py-1">Grid</div>
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm">
+                  <EyeOff size={14} /> Toggle Grid
                 </button>
               </div>
             )}
           </div>
 
-          {/* Layer */}
+          {/* Layer Menu */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("Layer")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
+              onClick={() => toggleMenu("layer")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <Layers size={16} /> <span className="text-sm">Layer</span>
+              <Layers size={16} />
+              <span className="text-sm">Layer</span>
             </button>
-            {openMenu === "Layer" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Plus size={14} /> Add Layer
+            {openMenu === "layer" && (
+              <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700">
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Plus size={16} /> Add Layer
                 </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Grid size={14} /> Manage Layers
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Grid size={16} /> Manage Layers
                 </button>
               </div>
             )}
           </div>
 
-          {/* Arsenal */}
+          {/* Tools Menu */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("Arsenal")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
+              onClick={() => toggleMenu("tools")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <Target size={16} /> <span className="text-sm">Arsenal</span>
+              <Ruler size={16} />
+              <span className="text-sm">Tools</span>
             </button>
-            {openMenu === "Arsenal" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Target size={14} /> Weapons List
+            {openMenu === "tools" && (
+              <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700 p-1">
+                <div className="text-xs text-gray-400 px-3 py-1">Measurements</div>
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Ruler size={16} /> Distance
                 </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Plus size={14} /> Add Weapon
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Box size={16} /> Area
+                </button>
+                <div className="border-t border-gray-700 my-1"></div>
+                <div className="text-xs text-gray-400 px-3 py-1">Analysis</div>
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Compass size={16} /> Contour Lines
                 </button>
               </div>
             )}
           </div>
 
-          {/* Unit */}
+          {/* Help Menu */}
           <div className="relative">
             <button
-              onClick={() => toggleMenu("Unit")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
+              onClick={() => toggleMenu("help")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <MapPin size={16} /> <span className="text-sm">Unit</span>
+              <Info size={16} />
+              <span className="text-sm">Help</span>
             </button>
-            {openMenu === "Unit" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <MapPin size={14} /> Add Unit
+            {openMenu === "help" && (
+              <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700 p-1">
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Info size={16} /> About
                 </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Compass size={14} /> Manage Units
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Impact Arc */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu("Impact Arc")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
-            >
-              <Target size={16} /> <span className="text-sm">Impact Arc</span>
-            </button>
-            {openMenu === "Impact Arc" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Target size={14} /> Draw Arc
-                </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Database size={14} /> Arc Settings
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Metadata */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu("Metadata")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
-            >
-              <Info size={16} /> <span className="text-sm">Metadata</span>
-            </button>
-            {openMenu === "Metadata" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Info size={14} /> View Metadata
-                </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Edit2 size={14} /> Edit Metadata
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Plugins */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu("Plugins")}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-800"
-            >
-              <PlugZap size={16} /> <span className="text-sm">Plugins</span>
-            </button>
-            {openMenu === "Plugins" && (
-              <div className="absolute left-0 mt-1 w-44 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <PlugZap size={14} /> Manage Plugins
-                </button>
-                <button className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-700 text-sm">
-                  <Plus size={14} /> Install Plugin
+                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
+                  <Box size={16} /> Documentation
                 </button>
               </div>
             )}
@@ -284,16 +258,14 @@ export default function TopPanel({onFileSelect,onTileLayerReady }) {
         </div>
       </div>
 
-      {/* Hidden file input for TIFF */}
+      {/* Hidden file input for OBJ models */}
       <input
-  type="file"
-  accept=".tif,.tiff"
-  onChange={(e) => {
-    if (e.target.files.length > 0) {
-      handleFileUpload(e.target.files[0]);
-    }
-  }}
-/>
+        type="file"
+        ref={fileInputRef}
+        accept=".obj"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
     </div>
   );
 }

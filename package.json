@@ -10,12 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "geotiff": "^2.1.4-beta.0",
-    "leaflet-geotiff": "^0.2.0",
+    "@react-three/drei": "^10.7.4",
+    "@react-three/fiber": "^9.3.0",
     "lucide-react": "^0.542.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-resizable-panels": "^3.0.5"
+    "react-resizable-panels": "^3.0.5",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
