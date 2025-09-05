@@ -258,7 +258,10 @@ function DistanceLine({ start, end, calculateDistance }) {
 }
 
 // Scene setup
-function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, distanceMode, distancePoints, calculateDistance,terrainRef }) {
+function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, distanceMode, distancePoints, calculateDistance,terrainRef , aoiMode,
+  setAoiMode,
+  aoiPoints,
+  setAoiPoints }) {
   const { camera, gl, scene } = useThree();
   // const terrainRef = useRef();
   const planeRef = useRef();
@@ -316,6 +319,31 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
       gl.domElement.removeEventListener('click', handleDistanceClick);
     };
   }, [distanceMode, gl, camera, raycaster, terrainRef, planeRef]);
+
+  // 1. Update the AOI click handler in Scene component:
+useEffect(() => {
+  if (!aoiMode || !aoiMode.active) return;
+
+  const handleAOIClick = (event) => {
+    event.stopPropagation();
+    const rect = gl.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const terrainObjects = terrainRef.current ? [terrainRef.current] : [];
+    const intersects = raycaster.intersectObjects(terrainObjects, true);
+    if (intersects.length > 0) {
+      const point = intersects[0].point.clone();
+      setAoiPoints((prev) => [...prev, { x: point.x, y: point.y, z: point.z }]);
+    }
+  };
+
+  gl.domElement.addEventListener("click", handleAOIClick);
+  return () => gl.domElement.removeEventListener("click", handleAOIClick);
+}, [aoiMode, gl, camera, raycaster, setAoiPoints]);
+
 
   // Handle mouse move for preview marker
   useEffect(() => {
@@ -528,7 +556,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
           {previewGeometry}
         </group>
       )}
-
+     
       {/* Distance measurement line */}
      {distancePoints.length >= 2 && (
   <DistanceLine
@@ -536,6 +564,55 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
     end={distancePoints[1]}
     calculateDistance={calculateDistance}
   />
+)}
+
+{/* AOI Visualization */}
+{aoiPoints.length > 0 && (
+  <group>
+    {/* Render AOI points as markers */}
+    {aoiPoints.map((point, index) => (
+      <mesh key={`aoi-point-${index}`} position={[point.x, point.y + 0.05, point.z]}>
+        <sphereGeometry args={[0.02, 16, 16]} />
+        <meshStandardMaterial color="cyan" emissive="cyan" emissiveIntensity={0.3} />
+      </mesh>
+    ))}
+    
+    {/* Render AOI polygon when we have 3+ points */}
+    {aoiPoints.length >= 3 && (
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <shapeGeometry
+          args={[
+            new THREE.Shape(
+              aoiPoints.map((p) => new THREE.Vector2(p.x, p.z))
+            )
+          ]}
+        />
+        <meshBasicMaterial color="cyan" opacity={0.2} transparent side={THREE.DoubleSide} />
+      </mesh>
+    )}
+    
+    {/* Render AOI boundary lines */}
+    {aoiPoints.length > 1 && (
+      <group>
+        {aoiPoints.map((point, index) => {
+          const nextPoint = aoiPoints[(index + 1) % aoiPoints.length];
+          if (index === aoiPoints.length - 1 && aoiPoints.length < 3) return null;
+          
+          const points = [
+            new THREE.Vector3(point.x, point.y + 0.02, point.z),
+            new THREE.Vector3(nextPoint.x, nextPoint.y + 0.02, nextPoint.z)
+          ];
+          const geometry = new THREE.BufferGeometry().setFromPoints(points);
+          
+          return (
+            <line key={`aoi-line-${index}`} geometry={geometry}>
+              <lineBasicMaterial color="cyan" linewidth={3} />
+            </line>
+          );
+        })}
+      </group>
+    )}
+  </group>
 )}
       <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
       <OrbitControls
@@ -546,6 +623,8 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
         enabled={!isDraggingItem} // Disable when dragging items
       />
     </>
+
+    
   );
 }
 
@@ -578,6 +657,17 @@ const [aoiPolygon, setAoiPolygon] = useState(null);
       window.removeEventListener('startDistanceTool', handleStartDistanceTool);
     };
   }, []);
+
+  useEffect(() => {
+  const handleStartAOI = () => {
+    setAoiMode({ active: true });
+    setAoiPoints([]);
+    setAoiPolygon(null);
+    console.log("AOI tool activated");
+  };
+  window.addEventListener("startAOITool", handleStartAOI);
+  return () => window.removeEventListener("startAOITool", handleStartAOI);
+}, []);
 
   // Listen for distance point selection from Scene component
   useEffect(() => {
@@ -707,6 +797,10 @@ const intersects = raycaster.intersectObjects(terrainObjects, true);
           distancePoints={distancePoints}
           calculateDistance={calculateDistance}
           terrainRef={terrainRef} 
+            aoiMode={aoiMode}          // NEW
+  setAoiMode={setAoiMode}    // NEW
+  aoiPoints={aoiPoints}      // NEW
+  setAoiPoints={setAoiPoints} // NEW
         />
       </Canvas>
 
@@ -749,6 +843,39 @@ const intersects = raycaster.intersectObjects(terrainObjects, true);
           </div>
         </div>
       )}
+
+      {/* AOI Mode Visual Feedback */}
+{aoiMode && aoiMode.active && (
+  <div className="absolute top-32 left-4 z-50 bg-cyan-600/90 text-white text-sm px-4 py-2 rounded-md shadow-lg border-2 border-cyan-400">
+    <div className="font-bold">Area of Interest Tool Active</div>
+    <div className="text-xs mt-1 opacity-90">
+      Click on terrain to select points
+    </div>
+    <div className="text-xs opacity-75">
+      Points selected: {aoiPoints.length}
+    </div>
+    {aoiPoints.length >= 3 && (
+      <button
+        onClick={() => {
+          setAoiMode({ active: false, completed: true });
+          console.log('AOI completed with points:', aoiPoints);
+        }}
+        className="mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+      >
+        Complete AOI
+      </button>
+    )}
+    <button
+      onClick={() => {
+        setAoiMode({ active: false });
+        setAoiPoints([]);
+      }}
+      className="mt-2 ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+    >
+      Cancel
+    </button>
+  </div>
+)}
 
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-40">
