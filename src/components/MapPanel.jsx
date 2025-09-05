@@ -42,13 +42,14 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
     
     if (intersects.length > 0) {
-      const point = intersects[0].point.clone();
-      // Calculate proper surface offset based on item type and geometry
-      const surfaceOffset = type === 'troops' ? 0.09375 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1;
+      const terrainHeight = intersects[0].point.y;
       
-      // Position item directly on the surface with minimal offset
-      point.y = intersects[0].point.y + surfaceOffset;
-      groupRef.current.position.set(point.x, point.y, point.z);
+      // Calculate proper surface offset based on item type geometry (half the object height)
+      const surfaceOffset = type === 'troops' ? 0.023 : type === 'arsenal' ? 0.0125 : type === 'vehicles' ? 0.01875 : 0.025;
+      
+      // Position item so its bottom touches the terrain surface
+      const finalY = terrainHeight + surfaceOffset;
+      groupRef.current.position.set(intersects[0].point.x, finalY, intersects[0].point.z);
     }
   };
 
@@ -80,16 +81,16 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
 
   // Define impact circle radius based on type (reduced by 50%)
   const impactRadius = type === 'troops' ? 0.0250 : type === 'arsenal' ? 0.050 : type === 'vehicles' ? 0.050 : 0.0900;
-  // Define geometry and material based on type
+  // Define geometry and material based on type - positioned so bottom touches ground
   const geometry = type === 'troops' ? (
     <>
-      <mesh position={[0, 0.09375, 0]}>
+      <mesh position={[0, 0.023, 0]}>
         <cylinderGeometry args={[0.00625, 0.00625, 0.046875, 32]} />
         <meshStandardMaterial 
           color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
         />
       </mesh>
-      <mesh position={[0, 0.0703125, 0]}>
+      <mesh position={[0, 0.046, 0]}>
         <sphereGeometry args={[0.0046875, 32, 32]} />
         <meshStandardMaterial 
           color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
@@ -97,21 +98,21 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
       </mesh>
     </>
   ) : type === 'arsenal' ? (
-    <mesh position={[0, 0.05, 0]}>
+    <mesh position={[0, 0.0125, 0]}>
       <boxGeometry args={[0.025, 0.025, 0.025]} />
       <meshStandardMaterial 
         color={isDragging ? "lightblue" : isHovered ? "darkblue" : "blue"} 
       />
     </mesh>
   ) : type === 'vehicles' ? (
-    <mesh position={[0, 0.075, 0]}>
+    <mesh position={[0, 0.01875, 0]}>
       <boxGeometry args={[0.0375, 0.0375, 0.0375]} />
       <meshStandardMaterial 
         color={isDragging ? "yellow" : isHovered ? "goldenrod" : "orange"} 
       />
     </mesh>
   ) : (
-    <mesh position={[0, 0.1, 0]}>
+    <mesh position={[0, 0.025, 0]}>
       <cylinderGeometry args={[0.0125, 0.0125, 0.05, 32]} />
       <meshStandardMaterial 
         color={isDragging ? "salmon" : isHovered ? "darkred" : "red"} 
@@ -153,7 +154,7 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
       {impactCircle}
       {geometry}
       {/* Larger invisible collision mesh for easier interaction */}
-      <mesh position={[0, type === 'troops' ? 0.125 : type === 'arsenal' ? 0.05 : type === 'vehicles' ? 0.075 : 0.1, 0]} visible={false}>
+      <mesh position={[0, type === 'troops' ? 0.046 : type === 'arsenal' ? 0.0125 : type === 'vehicles' ? 0.01875 : 0.025, 0]} visible={false}>
         <boxGeometry args={[0.12, 0.3, 0.12]} />
         <meshBasicMaterial />
       </mesh>
@@ -362,13 +363,14 @@ useEffect(() => {
       const intersects = raycaster.intersectObjects(objectsToIntersect, true);
 
       if (intersects.length > 0) {
-        const point = intersects[0].point.clone();
-        // Calculate proper surface offset based on item type and geometry
-        const surfaceOffset = deployMode.type === 'troops' ? 0.09375 : deployMode.type === 'arsenal' ? 0.05 : deployMode.type === 'vehicles' ? 0.075 : 0.1;
+        const terrainHeight = intersects[0].point.y;
         
-        // Position item directly on the surface with minimal offset
-        point.y = intersects[0].point.y + surfaceOffset;
-        setPreviewPosition([point.x, point.y, point.z]);
+        // Calculate proper surface offset based on item type geometry (half the object height)
+        const surfaceOffset = deployMode.type === 'troops' ? 0.023 : deployMode.type === 'arsenal' ? 0.0125 : deployMode.type === 'vehicles' ? 0.01875 : 0.025;
+        
+        // Position item so its bottom touches the terrain surface
+        const finalY = terrainHeight + surfaceOffset;
+        setPreviewPosition([intersects[0].point.x, finalY, intersects[0].point.z]);
       } else {
         setPreviewPosition(null);
       }
@@ -446,20 +448,19 @@ useEffect(() => {
   
   const previewImpactRadius = deployMode.type === 'troops' ? 0.0250  : deployMode.type === 'arsenal' ?  0.050  : deployMode.type === 'vehicles' ?0.050 : 0.0900;
 
-  // Preview geometry based on type
+  // Preview geometry based on type - positioned so bottom touches ground
   const previewGeometry = deployMode.type === 'troops' ? (
     <>
       {/* Preview impact circle */}
-      
       <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 0.0234375, 0]}>
+      <mesh position={[0, 0.023, 0]}> {/* Half of height 0.046875 */}
         <cylinderGeometry args={[0.00625, 0.00625, 0.046875, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
-     <mesh position={[0, 0.0703125, 0]}>
+      <mesh position={[0, 0.046, 0]}> {/* Positioned relative to cylinder */}
         <sphereGeometry args={[0.0046875, 32, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
@@ -471,7 +472,7 @@ useEffect(() => {
         <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 0.05, 0]}>
+      <mesh position={[0, 0.0125, 0]}> {/* Half of height 0.025 */}
         <boxGeometry args={[0.025, 0.025, 0.025]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
@@ -483,7 +484,7 @@ useEffect(() => {
         <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 0.075, 0]}>
+      <mesh position={[0, 0.01875, 0]}> {/* Half of height 0.0375 */}
         <boxGeometry args={[0.0375, 0.0375, 0.0375]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
@@ -495,7 +496,7 @@ useEffect(() => {
         <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 0.1, 0]}>
+      <mesh position={[0, 0.025, 0]}> {/* Half of height 0.05 */}
         <cylinderGeometry args={[0.0125, 0.0125, 0.05, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
@@ -655,17 +656,15 @@ useEffect(() => {
 
 
 
-export default function MapPanel({ layers = [], deployMode, setDeployMode, missionDetails, setMissionDetails, items, setItems }) {
+export default function MapPanel({ layers = [], deployMode, setDeployMode, missionDetails, setMissionDetails, items, setItems, aoiPoints, setAoiPoints, distancePoints, setDistancePoints }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0, z: 0 });
   const canvasRef = useRef();
   const [modelLocked, setModelLocked] = useState(false);
   const [distanceMode, setDistanceMode] = useState({ active: false });
-  const [distancePoints, setDistancePoints] = useState([]);
   const [aoiMode, setAoiMode] = useState({ active: false });
-const [aoiPoints, setAoiPoints] = useState([]);
-const [aoiPolygon, setAoiPolygon] = useState(null);
+  const [aoiPolygon, setAoiPolygon] = useState(null);
   const terrainRef = useRef();
 
   // Listen for distance tool activation

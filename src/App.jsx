@@ -8,14 +8,16 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 export default function App() {
   const [modelFile, setModelFile] = useState(null);
   const [layers, setLayers] = useState([]);
-  const [deployMode, setDeployMode] = useState(false); // Soldier deploy mode toggle
+  const [items, setItems] = useState([]); // Deployed items state lifted up
   const [missionDetails, setMissionDetails] = useState({
     troops: 0,
     arsenal: 0,
     vehicles: 0,
     tanks: 0,
   });
-  const [items, setItems] = useState([]); // Deployed items state lifted up
+  const [deployMode, setDeployMode] = useState({ active: false, type: null });
+  const [aoiPoints, setAoiPoints] = useState([]);
+  const [distancePoints, setDistancePoints] = useState([]);
   const [sceneClearTrigger, setSceneClearTrigger] = useState(0); // Used to trigger remounting
 
   const handleModelSelect = (file) => {
@@ -64,6 +66,8 @@ export default function App() {
         items={items}
         layers={layers}
         missionDetails={missionDetails}
+        aoiPoints={aoiPoints}
+        distancePoints={distancePoints}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -105,6 +109,10 @@ export default function App() {
                 setMissionDetails={setMissionDetails}
                 items={items}
                 setItems={setItems}
+                aoiPoints={aoiPoints}
+                setAoiPoints={setAoiPoints}
+                distancePoints={distancePoints}
+                setDistancePoints={setDistancePoints}
               />
             </div>
           </Panel>

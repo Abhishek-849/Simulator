@@ -20,7 +20,7 @@ import {
   Map,
 } from "lucide-react";
 
-export default function TopPanel({ onModelSelect, onClearScene, setMissionDetails, resetMissionDetails, items = [], layers = [], missionDetails = {} }) {
+export default function TopPanel({ onModelSelect, onClearScene, setMissionDetails, resetMissionDetails, items = [], layers = [], missionDetails = {}, aoiPoints = [], distancePoints = [] }) {
   const [openMenu, setOpenMenu] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -106,38 +106,67 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
         const [x, y, z] = item.position;
         const scale = item.type === 'troops' ? 0.03 : item.type === 'arsenal' ? 0.04 : item.type === 'vehicles' ? 0.08 : 0.12;
 
+        // Add object/group definition first
+        objContent += `o ${item.type}_${index + 1}\n`;
+        objContent += `g ${item.type}_${index + 1}\n`;
+
         // Create different geometries based on item type
         let geometryData;
         switch (item.type) {
           case 'troops':
-            // Simple cylinder for troops
+            // Simple cylinder approximation for troops (8-sided)
             geometryData = {
               vertices: [
-                [0, scale, 0],      // v1
-                [scale, 0, 0],      // v2
-                [-scale, 0, 0],     // v3
-                [0, -scale, 0],     // v4
+                // Bottom circle vertices
+                [scale, 0, 0],
+                [scale * 0.707, 0, scale * 0.707],
+                [0, 0, scale],
+                [-scale * 0.707, 0, scale * 0.707],
+                [-scale, 0, 0],
+                [-scale * 0.707, 0, -scale * 0.707],
+                [0, 0, -scale],
+                [scale * 0.707, 0, -scale * 0.707],
+                // Top circle vertices
+                [scale, scale * 2, 0],
+                [scale * 0.707, scale * 2, scale * 0.707],
+                [0, scale * 2, scale],
+                [-scale * 0.707, scale * 2, scale * 0.707],
+                [-scale, scale * 2, 0],
+                [-scale * 0.707, scale * 2, -scale * 0.707],
+                [0, scale * 2, -scale],
+                [scale * 0.707, scale * 2, -scale * 0.707],
               ],
-              faces: [[1, 2, 3], [1, 3, 4], [1, 4, 2], [2, 4, 3]]
+              faces: [
+                // Bottom face
+                [1, 2, 3, 4, 5, 6, 7, 8],
+                // Top face
+                [16, 15, 14, 13, 12, 11, 10, 9],
+                // Side faces
+                [1, 9, 10, 2], [2, 10, 11, 3], [3, 11, 12, 4], [4, 12, 13, 5],
+                [5, 13, 14, 6], [6, 14, 15, 7], [7, 15, 16, 8], [8, 16, 9, 1]
+              ]
             };
             break;
           case 'arsenal':
             // Box for arsenal
             geometryData = {
               vertices: [
-                [-scale, -scale, -scale], // v1
-                [scale, -scale, -scale],  // v2
-                [scale, scale, -scale],   // v3
-                [-scale, scale, -scale],  // v4
-                [-scale, -scale, scale],  // v5
-                [scale, -scale, scale],   // v6
-                [scale, scale, scale],    // v7
-                [-scale, scale, scale],   // v8
+                [-scale, 0, -scale],      // v1 bottom
+                [scale, 0, -scale],       // v2
+                [scale, 0, scale],        // v3
+                [-scale, 0, scale],       // v4
+                [-scale, scale * 2, -scale], // v5 top
+                [scale, scale * 2, -scale],  // v6
+                [scale, scale * 2, scale],   // v7
+                [-scale, scale * 2, scale],  // v8
               ],
               faces: [
-                [1, 2, 3, 4], [5, 8, 7, 6], // bottom/top
-                [1, 4, 8, 5], [2, 6, 7, 3], // sides
-                [1, 5, 6, 2], [4, 3, 7, 8]  // front/back
+                [1, 4, 3, 2], // bottom
+                [5, 6, 7, 8], // top
+                [1, 2, 6, 5], // front
+                [3, 4, 8, 7], // back
+                [2, 3, 7, 6], // right
+                [4, 1, 5, 8]  // left
               ]
             };
             break;
@@ -145,19 +174,22 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
             // Longer box for vehicles
             geometryData = {
               vertices: [
-                [-scale*1.5, -scale, -scale/2], // v1
-                [scale*1.5, -scale, -scale/2],  // v2
-                [scale*1.5, scale, -scale/2],   // v3
-                [-scale*1.5, scale, -scale/2],  // v4
-                [-scale*1.5, -scale, scale/2],  // v5
-                [scale*1.5, -scale, scale/2],   // v6
-                [scale*1.5, scale, scale/2],    // v7
-                [-scale*1.5, scale, scale/2],   // v8
+                [-scale*1.5, 0, -scale/2],      // v1 bottom
+                [scale*1.5, 0, -scale/2],       // v2
+                [scale*1.5, 0, scale/2],        // v3
+                [-scale*1.5, 0, scale/2],       // v4
+                [-scale*1.5, scale * 1.5, -scale/2], // v5 top
+                [scale*1.5, scale * 1.5, -scale/2],  // v6
+                [scale*1.5, scale * 1.5, scale/2],   // v7
+                [-scale*1.5, scale * 1.5, scale/2],  // v8
               ],
               faces: [
-                [1, 2, 3, 4], [5, 8, 7, 6], // bottom/top
-                [1, 4, 8, 5], [2, 6, 7, 3], // sides
-                [1, 5, 6, 2], [4, 3, 7, 8]  // front/back
+                [1, 4, 3, 2], // bottom
+                [5, 6, 7, 8], // top
+                [1, 2, 6, 5], // front
+                [3, 4, 8, 7], // back
+                [2, 3, 7, 6], // right
+                [4, 1, 5, 8]  // left
               ]
             };
             break;
@@ -165,19 +197,22 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
             // Large box for tanks
             geometryData = {
               vertices: [
-                [-scale, -scale, -scale*1.2], // v1
-                [scale, -scale, -scale*1.2],  // v2
-                [scale, scale, -scale*1.2],   // v3
-                [-scale, scale, -scale*1.2],  // v4
-                [-scale, -scale, scale],      // v5
-                [scale, -scale, scale],       // v6
-                [scale, scale, scale],        // v7
-                [-scale, scale, scale],       // v8
+                [-scale, 0, -scale*1.2],      // v1 bottom
+                [scale, 0, -scale*1.2],       // v2
+                [scale, 0, scale],            // v3
+                [-scale, 0, scale],           // v4
+                [-scale, scale * 1.8, -scale*1.2], // v5 top
+                [scale, scale * 1.8, -scale*1.2],  // v6
+                [scale, scale * 1.8, scale],        // v7
+                [-scale, scale * 1.8, scale],       // v8
               ],
               faces: [
-                [1, 2, 3, 4], [5, 8, 7, 6], // bottom/top
-                [1, 4, 8, 5], [2, 6, 7, 3], // sides
-                [1, 5, 6, 2], [4, 3, 7, 8]  // front/back
+                [1, 4, 3, 2], // bottom
+                [5, 6, 7, 8], // top
+                [1, 2, 6, 5], // front
+                [3, 4, 8, 7], // back
+                [2, 3, 7, 6], // right
+                [4, 1, 5, 8]  // left
               ]
             };
             break;
@@ -185,21 +220,21 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
             return; // Skip unknown types
         }
 
+        // Store current vertex count before adding new vertices
+        const startVertexIndex = vertexCount + 1;
+
         // Add vertices with position translation
         geometryData.vertices.forEach(([vx, vy, vz]) => {
-          objContent += `v ${x + vx} ${y + vy - 0.05} ${z + vz}\n`; // Subtract small offset for ground placement
+          objContent += `v ${(x + vx).toFixed(6)} ${(y + vy).toFixed(6)} ${(z + vz).toFixed(6)}\n`;
           vertexCount++;
         });
 
-        // Add faces (OBJ face indices are 1-based)
-        const baseIndex = vertexCount - geometryData.vertices.length;
+        // Add faces (OBJ face indices are 1-based and relative to start of this object)
         geometryData.faces.forEach(face => {
-          const faceStr = face.map(idx => idx + baseIndex).join(' ');
+          const faceStr = face.map(idx => idx + startVertexIndex - 1).join(' ');
           objContent += `f ${faceStr}\n`;
         });
 
-        // Add material group
-        objContent += `g ${item.type}-${index + 1}\n`;
         objContent += `\n`;
       });
 
@@ -234,15 +269,23 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
             }, {}),
             missionDetails,
             generatedAt: new Date().toISOString(),
-            terrainModel: layers.find(l => l.type === 'model')?.name || 'No terrain loaded'
-          }
+            terrainModel: layers.find(l => l.type === 'model')?.name || 'No terrain loaded',
+            aoiPoints: aoiPoints || [],
+            distancePoints: distancePoints || [],
+            deployedItems: items
+          },
+          originalTerrainFile: layers.find(l => l.type === 'model')?.file || null
         })
       });
 
       const result = await response.json();
 
       if (result.success) {
-        alert(`✅ Mission saved successfully!\n\n📁 File: ${result.filename}\n📍 Location: ${result.path}\n📊 Assets: ${totalItems}`);
+        const aoiCount = aoiPoints?.length || 0;
+        const distanceCount = distancePoints?.length || 0;
+        const terrainCopied = result.original_terrain_copied ? '✅ Original terrain included' : '⚠️ Original terrain not found';
+        
+        alert(`✅ Mission saved successfully!\n\n📁 Mission Folder: ${result.mission_folder}\n📊 Assets: ${totalItems}\n📍 AOI Points: ${aoiCount}\n📏 Distance Measurements: ${distanceCount}\n🗺️ ${terrainCopied}\n\nFiles created:\n• ${result.filename} (Mission with deployed objects)\n• ${result.metadata_file} (Mission metadata)\n• README.txt (Mission summary)`);
       } else {
         throw new Error(result.error || 'Unknown error occurred');
       }
