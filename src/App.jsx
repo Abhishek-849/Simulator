@@ -41,6 +41,8 @@ export default function App() {
     // Clear 3D model layers and increment trigger to force MapPanel remount
     handleModelSelect(null);
     setSceneClearTrigger(prev => prev + 1);
+    // Also clear deployed items
+    setItems([]);
   };
 
   const resetMissionDetails = () => {

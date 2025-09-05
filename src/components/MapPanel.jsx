@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 
 // Draggable Item component with manual drag implementation
-function DraggableItem({ position, index, type, onPositionChange, onRepositionRequest, terrainRef, planeRef }) {
+function DraggableItem({ position, index, type, onPositionChange, terrainRef, planeRef }) {
   const { camera, gl } = useThree();
   const groupRef = useRef();
   const [isDragging, setIsDragging] = useState(false);
@@ -18,13 +18,7 @@ function DraggableItem({ position, index, type, onPositionChange, onRepositionRe
   const handlePointerDown = (event) => {
     event.stopPropagation();
 
-    // If model is locked and item exists, show confirmation first
-    if (!isDragging && typeof onRepositionRequest === 'function') {
-      onRepositionRequest(index, type);
-      return; // Don't start dragging yet, wait for confirmation
-    }
-
-    // Start dragging normally (for unlocked states or when confirmed)
+    // Start dragging if not already locked for repositioning
     if (!isDragging) {
       setIsDragging(true);
       gl.domElement.style.cursor = 'grabbing';
@@ -84,8 +78,8 @@ function DraggableItem({ position, index, type, onPositionChange, onRepositionRe
     }
   }, [isDragging, handleGlobalPointerMove, handleGlobalPointerUp]);
 
-  // Define impact circle radius based on type
-  const impactRadius = type === 'troops' ? 0.3 : type === 'arsenal' ? 0.6 : type === 'vehicles' ? 0.6 : 1.0; // tanks get largest radius
+  // Define impact circle radius based on type (reduced by 50%)
+  const impactRadius = type === 'troops' ? 0.15 : type === 'arsenal' ? 0.3 : type === 'vehicles' ? 0.3 : 0.5; // tanks get largest radius
 
   // Define geometry and material based on type
   const geometry = type === 'troops' ? (
@@ -265,7 +259,7 @@ function DistanceLine({ start, end, calculateDistance }) {
 }
 
 // Scene setup
-function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, handleRepositionRequest, distanceMode, distancePoints, calculateDistance }) {
+function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, distanceMode, distancePoints, calculateDistance }) {
   const { camera, gl, scene } = useThree();
   const terrainRef = useRef();
   const planeRef = useRef();
@@ -421,8 +415,8 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
     });
   }, [items]);
 
-  // Preview impact circle radius based on type
-  const previewImpactRadius = deployMode.type === 'troops' ? 0.3 : deployMode.type === 'arsenal' ? 0.6 : deployMode.type === 'vehicles' ? 0.6 : 1.0;
+  // Preview impact circle radius based on type (reduced by 50%)
+  const previewImpactRadius = deployMode.type === 'troops' ? 0.15 : deployMode.type === 'arsenal' ? 0.3 : deployMode.type === 'vehicles' ? 0.3 : 0.5;
 
   // Preview geometry based on type
   const previewGeometry = deployMode.type === 'troops' ? (
@@ -522,7 +516,6 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
           index={idx}
           type={item.type}
           onPositionChange={handleItemPositionChange}
-          onRepositionRequest={handleRepositionRequest}
           terrainRef={terrainRef}
           planeRef={planeRef}
         />
@@ -556,47 +549,12 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
   );
 }
 
-// Confirmation dialog component for repositioning items
-function ConfirmationDialog({ isOpen, onClose, onConfirm, message }) {
-  if (!isOpen) return null;
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] pointer-events-auto"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white p-6 rounded-lg shadow-lg w-96 max-w-[90vw]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-bold mb-4 text-gray-800">
-          Confirm Repositioning
-        </h2>
-        <p className="text-gray-700 mb-6">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-blue-500 text-blue-100 rounded hover:bg-blue-600 transition-colors"
-          >
-            Reposition
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function MapPanel({ layers = [], deployMode, setDeployMode, missionDetails, setMissionDetails, items, setItems }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0, z: 0 });
-  const [confirmationDialog, setConfirmationDialog] = useState({ isOpen: false, itemIndex: -1, type: '' });
   const canvasRef = useRef();
   const [modelLocked, setModelLocked] = useState(false);
   const [distanceMode, setDistanceMode] = useState({ active: false });
@@ -681,27 +639,7 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
 
 
 
-  // Handle repositioning request
-  const handleRepositionRequest = (index, type) => {
-    if (modelLocked && layers.length > 0) {
-      setConfirmationDialog({
-        isOpen: true,
-        itemIndex: index,
-        type: type
-      });
-    }
-  };
 
-  // Handle confirmation dialog close
-  const closeConfirmationDialog = () => {
-    setConfirmationDialog({ isOpen: false, itemIndex: -1, type: '' });
-  };
-
-  // Handle confirmation of repositioning
-  const confirmRepositioning = () => {
-    setModelLocked(false);
-    setConfirmationDialog({ isOpen: false, itemIndex: -1, type: '' });
-  };
 
   useEffect(() => {
     const uploadModel = async (layer) => {
@@ -754,7 +692,6 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
           missionDetails={missionDetails}
           setMissionDetails={setMissionDetails}
           setModelLocked={setModelLocked}
-          handleRepositionRequest={handleRepositionRequest}
           distanceMode={distanceMode}
           distancePoints={distancePoints}
           calculateDistance={calculateDistance}
@@ -815,13 +752,7 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
         </div>
       )}
 
-      {/* Confirmation Dialog for repositioning */}
-      <ConfirmationDialog
-        isOpen={confirmationDialog.isOpen}
-        onClose={closeConfirmationDialog}
-        onConfirm={confirmRepositioning}
-        message={`Do you want to reposition this ${confirmationDialog.type}? The 3D model will be unlocked for repositioning.`}
-      />
+
     </div>
   );
 }
