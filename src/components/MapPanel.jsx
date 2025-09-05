@@ -578,18 +578,43 @@ useEffect(() => {
     ))}
     
     {/* Render AOI polygon when we have 3+ points */}
-    {aoiPoints.length >= 3 && (
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <shapeGeometry
+   {/* Render AOI polygon when we have 3+ points */}
+{/* Render AOI polygon when we have 3+ points */}
+{aoiPoints.length >= 3 && (
+  <group>
+    {/* Create triangulated mesh for the AOI area */}
+    <mesh position={[0, 0.02, 0]}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
           args={[
-            new THREE.Shape(
-              aoiPoints.map((p) => new THREE.Vector2(p.x, p.z))
-            )
+            new Float32Array((() => {
+              const vertices = [];
+              // Create triangulated surface from AOI points
+              for (let i = 1; i < aoiPoints.length - 1; i++) {
+                // Triangle fan from first point
+                vertices.push(
+                  aoiPoints[0].x, aoiPoints[0].y, aoiPoints[0].z,
+                  aoiPoints[i].x, aoiPoints[i].y, aoiPoints[i].z,
+                  aoiPoints[i + 1].x, aoiPoints[i + 1].y, aoiPoints[i + 1].z
+                );
+              }
+              return vertices;
+            })()),
+            3
           ]}
         />
-        <meshBasicMaterial color="cyan" opacity={0.2} transparent side={THREE.DoubleSide} />
-      </mesh>
-    )}
+      </bufferGeometry>
+      <meshBasicMaterial 
+        color="yellow" 
+        opacity={0.5} 
+        transparent 
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  </group>
+)}
     
     {/* Render AOI boundary lines */}
     {aoiPoints.length > 1 && (
