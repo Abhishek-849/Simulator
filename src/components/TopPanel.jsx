@@ -290,11 +290,11 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
                 </button>
                 <div className="border-t border-gray-700 my-1"></div>
                 <button
-                  onClick={handleClearScene}
-                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
-                >
-                  Clear Scene
-                </button>
+  onClick={() => window.location.reload()}
+  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+>
+  Clear Scene
+</button>
               </div>
             )}
           </div>
@@ -387,8 +387,13 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
                 >
                   <Ruler size={16} /> Distance
                 </button>
-                <button className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left">
-                  <Box size={16} /> Area
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new Event("startAOITool"));
+                  }}
+                  className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Area of Interest
                 </button>
                 <div className="border-t border-gray-700 my-1"></div>
                 <div className="text-xs text-gray-400 px-3 py-1">Analysis</div>

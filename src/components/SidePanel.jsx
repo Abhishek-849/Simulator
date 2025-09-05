@@ -13,11 +13,14 @@ function ElevationGraph({ elevationData }) {
   const range = maxElev - minElev || 1; // Avoid division by zero
 
   // Create SVG path for elevation profile
-  const pathData = points.map((point, index) => {
-    const x = (index / (points.length - 1)) * 280; // Scale to fit within 300px width, leave margins
-    const y = 80 - ((point.elevation - minElev) / range) * 60; // Scale to 60px height within 80px area
-    return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-  }).join(' ');
+ const xScale = (index) => 20 + (index / (points.length - 1)) * 260;
+const yScale = (elev) => 100 - ((elev - minElev) / range) * 80;
+
+const pathData = points.map((point, index) => {
+  const x = xScale(index);
+  const y = yScale(point.elevation);
+  return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+}).join(' ');
 
   // Also create individual data points for better visibility
   const dotPoints = points.filter((_, index) => index % 5 === 0); // Show every 5th point as a dot
@@ -40,7 +43,8 @@ function ElevationGraph({ elevationData }) {
         Range: {range.toFixed(2)}m
       </div>
 
-      <svg width="320" height="120" className="border border-gray-200 rounded bg-white">
+      <svg width="100%" height="150" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet">
+
         {/* Grid lines */}
         <defs>
           <pattern id={`grid-${Math.random()}`} width="20" height="20" patternUnits="userSpaceOnUse">
@@ -50,14 +54,14 @@ function ElevationGraph({ elevationData }) {
         <rect width="280" height="80" fill="url(#grid)" x="20" y="20"/>
 
         {/* Elevation profile line */}
-        <path
-          d={`M 20 100 L 20 20 L ${pathData} L 300 100 Z`}
-          stroke="#2563eb"
-          strokeWidth="3"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+         <path
+  d={pathData}
+  stroke="#2563eb"
+  strokeWidth="2"
+  fill="none"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+/>
 
         {/* Individual data points for reference */}
         {dotPoints.map((point, index) => {

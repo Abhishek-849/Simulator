@@ -79,19 +79,18 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
   }, [isDragging, handleGlobalPointerMove, handleGlobalPointerUp]);
 
   // Define impact circle radius based on type (reduced by 50%)
-  const impactRadius = type === 'troops' ? 0.15 : type === 'arsenal' ? 0.3 : type === 'vehicles' ? 0.3 : 0.5; // tanks get largest radius
-
+  const impactRadius = type === 'troops' ? 0.0250 : type === 'arsenal' ? 0.050 : type === 'vehicles' ? 0.050 : 0.0900;
   // Define geometry and material based on type
   const geometry = type === 'troops' ? (
     <>
       <mesh position={[0, 0.09375, 0]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
+        <cylinderGeometry args={[0.00625, 0.00625, 0.046875, 32]} />
         <meshStandardMaterial 
           color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
         />
       </mesh>
-      <mesh position={[0, 0.20625, 0]}>
-        <sphereGeometry args={[0.01875, 32, 32]} />
+      <mesh position={[0, 0.0703125, 0]}>
+        <sphereGeometry args={[0.0046875, 32, 32]} />
         <meshStandardMaterial 
           color={isDragging ? "lightgreen" : isHovered ? "darkgreen" : "green"} 
         />
@@ -99,21 +98,21 @@ function DraggableItem({ position, index, type, onPositionChange, terrainRef, pl
     </>
   ) : type === 'arsenal' ? (
     <mesh position={[0, 0.05, 0]}>
-      <boxGeometry args={[0.1, 0.1, 0.1]} />
+      <boxGeometry args={[0.025, 0.025, 0.025]} />
       <meshStandardMaterial 
         color={isDragging ? "lightblue" : isHovered ? "darkblue" : "blue"} 
       />
     </mesh>
   ) : type === 'vehicles' ? (
     <mesh position={[0, 0.075, 0]}>
-      <boxGeometry args={[0.15, 0.15, 0.15]} />
+      <boxGeometry args={[0.0375, 0.0375, 0.0375]} />
       <meshStandardMaterial 
         color={isDragging ? "yellow" : isHovered ? "goldenrod" : "orange"} 
       />
     </mesh>
   ) : (
     <mesh position={[0, 0.1, 0]}>
-      <cylinderGeometry args={[0.05, 0.05, 0.2, 32]} />
+      <cylinderGeometry args={[0.0125, 0.0125, 0.05, 32]} />
       <meshStandardMaterial 
         color={isDragging ? "salmon" : isHovered ? "darkred" : "red"} 
       />
@@ -259,9 +258,9 @@ function DistanceLine({ start, end, calculateDistance }) {
 }
 
 // Scene setup
-function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, distanceMode, distancePoints, calculateDistance }) {
+function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setItems, missionDetails, setMissionDetails, setModelLocked, distanceMode, distancePoints, calculateDistance,terrainRef }) {
   const { camera, gl, scene } = useThree();
-  const terrainRef = useRef();
+  // const terrainRef = useRef();
   const planeRef = useRef();
   const orbitRef = useRef();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -416,22 +415,24 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
   }, [items]);
 
   // Preview impact circle radius based on type (reduced by 50%)
-  const previewImpactRadius = deployMode.type === 'troops' ? 0.15 : deployMode.type === 'arsenal' ? 0.3 : deployMode.type === 'vehicles' ? 0.3 : 0.5;
+  
+  const previewImpactRadius = deployMode.type === 'troops' ? 0.0250  : deployMode.type === 'arsenal' ?  0.050  : deployMode.type === 'vehicles' ?0.050 : 0.0900;
 
   // Preview geometry based on type
   const previewGeometry = deployMode.type === 'troops' ? (
     <>
       {/* Preview impact circle */}
+      
       <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[previewImpactRadius * 0.8, previewImpactRadius, 32]} />
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 0.09375, 0]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.1875, 32]} />
+      <mesh position={[0, 0.0234375, 0]}>
+        <cylinderGeometry args={[0.00625, 0.00625, 0.046875, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
-      <mesh position={[0, 0.20625, 0]}>
-        <sphereGeometry args={[0.01875, 32, 32]} />
+     <mesh position={[0, 0.0703125, 0]}>
+        <sphereGeometry args={[0.0046875, 32, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
     </>
@@ -443,7 +444,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, 0.05, 0]}>
-        <boxGeometry args={[0.1, 0.1, 0.1]} />
+        <boxGeometry args={[0.025, 0.025, 0.025]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
     </>
@@ -455,7 +456,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, 0.075, 0]}>
-        <boxGeometry args={[0.15, 0.15, 0.15]} />
+        <boxGeometry args={[0.0375, 0.0375, 0.0375]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
     </>
@@ -467,7 +468,7 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
         <meshBasicMaterial color="red" transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, 0.1, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.2, 32]} />
+        <cylinderGeometry args={[0.0125, 0.0125, 0.05, 32]} />
         <meshStandardMaterial color="blue" opacity={0.5} transparent />
       </mesh>
     </>
@@ -529,14 +530,13 @@ function Scene({ layers, setCoordinates, deployMode, setDeployMode, items, setIt
       )}
 
       {/* Distance measurement line */}
-      {distanceMode.active && distancePoints.length >= 2 && (
-        <DistanceLine
-          start={distancePoints[0]}
-          end={distancePoints[1]}
-          calculateDistance={calculateDistance}
-        />
-      )}
-
+     {distancePoints.length >= 2 && (
+  <DistanceLine
+    start={distancePoints[0]}
+    end={distancePoints[1]}
+    calculateDistance={calculateDistance}
+  />
+)}
       <gridHelper args={[10, 10]} rotation={[Math.PI / 2, 0, 0]} />
       <OrbitControls
         ref={orbitRef}
@@ -559,6 +559,10 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
   const [modelLocked, setModelLocked] = useState(false);
   const [distanceMode, setDistanceMode] = useState({ active: false });
   const [distancePoints, setDistancePoints] = useState([]);
+  const [aoiMode, setAoiMode] = useState({ active: false });
+const [aoiPoints, setAoiPoints] = useState([]);
+const [aoiPolygon, setAoiPolygon] = useState(null);
+  const terrainRef = useRef();
 
   // Listen for distance tool activation
   useEffect(() => {
@@ -585,16 +589,15 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
       setDistancePoints(newPoints);
 
       // If we have 2 points, create the elevation profile
-      if (newPoints.length === 2) {
-        const elevationData = sampleElevationAlongLine(newPoints[0], newPoints[1]);
-        window.dispatchEvent(new CustomEvent('elevationProfileUpdate', {
-          detail: elevationData
-        }));
-        console.log("Elevation profile generated");
+   if (newPoints.length === 2) {
+  const elevationData = sampleElevationAlongLine(newPoints[0], newPoints[1]);
+  window.dispatchEvent(new CustomEvent('elevationProfileUpdate', { detail: elevationData }));
+  console.log("Elevation profile generated");
 
-        // Deactivate distance mode after 2 points
-        setDistanceMode({ active: false });
-      }
+  // Lock in the two points so the yellow line stays,
+  // but stop accepting further clicks
+  setDistanceMode({ active: false, locked: true });
+}
     };
 
     window.addEventListener('distancePointSelected', handleDistancePointSelected);
@@ -613,29 +616,37 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
     );
   };
 
-  // Sample elevation points along the line
   const sampleElevationAlongLine = (startPoint, endPoint, numSamples = 50) => {
-    const points = [];
-    const distance = calculateDistance(startPoint, endPoint);
+  const points = [];
+  const distance = calculateDistance(startPoint, endPoint);
+  const raycaster = new THREE.Raycaster();
 
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / (numSamples - 1);
-      const x = startPoint.x + (endPoint.x - startPoint.x) * t;
-      const y = startPoint.y + (endPoint.y - startPoint.y) * t;
-      const z = startPoint.z + (endPoint.z - startPoint.z) * t;
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / (numSamples - 1);
+    const x = startPoint.x + (endPoint.x - startPoint.x) * t;
+    const z = startPoint.z + (endPoint.z - startPoint.z) * t;
 
-      const elevation = Math.max(y, startPoint.y, endPoint.y); // Simplified elevation, in reality this would sample terrain
+    // Cast ray straight down from very high Y
+    raycaster.set(new THREE.Vector3(x, 10000, z), new THREE.Vector3(0, -1, 0));
+const terrainObjects = terrainRef.current ? [terrainRef.current] : [];
+const intersects = raycaster.intersectObjects(terrainObjects, true);
 
-      points.push({
-        position: i,
-        distance: distance * t,
-        elevation: elevation,
-        worldPosition: { x, y, z }
-      });
+    let elevation = startPoint.y + (endPoint.y - startPoint.y) * t; // fallback: linear interp
+    if (intersects.length > 0) {
+      elevation = intersects[0].point.y;
     }
 
-    return { points, distance };
-  };
+    points.push({
+      position: i,
+      distance: distance * t,
+      elevation,
+      worldPosition: { x, y: elevation, z }
+    });
+  }
+
+  return { points, distance };
+};
+
 
 
 
@@ -695,6 +706,7 @@ export default function MapPanel({ layers = [], deployMode, setDeployMode, missi
           distanceMode={distanceMode}
           distancePoints={distancePoints}
           calculateDistance={calculateDistance}
+          terrainRef={terrainRef} 
         />
       </Canvas>
 
