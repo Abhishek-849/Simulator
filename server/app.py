@@ -3,6 +3,9 @@ from flask_cors import CORS
 import os
 import uuid
 from werkzeug.utils import secure_filename
+import base64
+import json
+import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -54,6 +57,39 @@ def upload_file():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+@app.route('/save-mission-json', methods=['POST'])
+def save_mission_json():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        filename = data.get("filename")
+        content = data.get("content")
+        if not filename or not content:
+            return jsonify({"error": "Missing filename or content"}), 400
+
+        # Create mission folder using timestamp from filename
+        timestamp = filename.replace("mission-plan-", "").replace(".json", "")
+        mission_dir = os.path.join(os.getcwd(), "mission-files", f"mission-{timestamp}")
+        os.makedirs(mission_dir, exist_ok=True)
+
+        # Save JSON mission file
+        mission_json_path = os.path.join(mission_dir, filename)
+        with open(mission_json_path, "w") as f:
+            json.dump(content, f, indent=2, default=str)
+
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "mission_folder": mission_dir,
+            "message": "Mission JSON saved successfully"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 @app.route('/save-mission', methods=['POST'])
 def save_mission():

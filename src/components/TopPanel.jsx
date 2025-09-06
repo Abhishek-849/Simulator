@@ -20,6 +20,8 @@ import {
   Map,
 } from "lucide-react";
 
+import html2canvas from "html2canvas";
+
 export default function TopPanel({ onModelSelect, onClearScene, setMissionDetails, resetMissionDetails, items = [], layers = [], missionDetails = {}, aoiPoints = [], distancePoints = [] }) {
   const [openMenu, setOpenMenu] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,6 +32,33 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
     tanks: "",
   });
   const fileInputRef = useRef(null);
+
+  const fileInputMissionRef = useRef(null); // NEW - for loading JSON missions
+
+const loadMission = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const missionData = JSON.parse(e.target.result);
+
+      // FIX: use deployedItems if items doesn’t exist
+      if (!missionData.items && missionData.deployedItems) {
+        missionData.items = missionData.deployedItems;
+      }
+
+      window.dispatchEvent(new CustomEvent("restoreMission", { detail: missionData }));
+      alert(`✅ Mission loaded: ${missionData.missionName || "Unnamed Mission"}`);
+    } catch (err) {
+      alert(`❌ Failed to load mission: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+};
+
+
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -318,28 +347,36 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
               <span className="text-sm">File</span>
             </button>
             {openMenu === "file" && (
-              <div className="absolute left-0 mt-1 w-48 bg-gray-800 rounded shadow-lg border border-gray-700">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
-                >
-                  <FolderOpen size={16} /> Open 3D Model
-                </button>
-                <button
-                  onClick={saveMission}
-                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
-                >
-                  <Save size={16} /> Save Mission
-                </button>
-                <div className="border-t border-gray-700 my-1"></div>
-                <button
-  onClick={() => window.location.reload()}
-  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
->
-  Clear Scene
-</button>
-              </div>
-            )}
+  <div className="absolute left-0 mt-1 w-56 bg-gray-800 rounded shadow-lg border border-gray-700">
+    <button
+      onClick={() => fileInputRef.current?.click()}
+      className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+    >
+      <FolderOpen size={16} /> Open 3D Model
+    </button>
+    <button
+      onClick={saveMission}
+      className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+    >
+      <Save size={16} /> Save Mission
+    </button>
+    <button
+      onClick={() => fileInputMissionRef.current?.click()}
+      className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+    >
+      <FolderOpen size={16} /> Load Mission
+    </button>
+    
+    <div className="border-t border-gray-700 my-1"></div>
+    <button
+      onClick={() => window.location.reload()}
+      className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
+    >
+      Clear Scene
+    </button>
+  </div>
+)}
+
           </div>
 
           {/* Plan Mission Button */}
@@ -490,13 +527,22 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
       </div>
 
       {/* Hidden file input for OBJ models */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept=".obj"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
+     {/* Hidden file inputs */}
+<input
+  type="file"
+  ref={fileInputRef}
+  accept=".obj"
+  onChange={handleFileSelect}
+  className="hidden"
+/>
+<input
+  type="file"
+  ref={fileInputMissionRef}
+  accept=".json"
+  onChange={loadMission}
+  className="hidden"
+/>
+
 
       {/* Mission Planning Modal */}
       {isModalOpen && (

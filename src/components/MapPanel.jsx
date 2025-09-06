@@ -804,6 +804,20 @@ const intersects = raycaster.intersectObjects(terrainObjects, true);
     });
   }, [layers]);
 
+  useEffect(() => {
+  const handleRestoreMission = (event) => {
+    const missionData = event.detail;
+    if (missionData.items) setItems(missionData.items);
+    if (missionData.missionDetails) setMissionDetails(missionData.missionDetails);
+    if (missionData.aoiPoints) setAoiPoints(missionData.aoiPoints);
+    if (missionData.distancePoints) setDistancePoints(missionData.distancePoints);
+  };
+
+  window.addEventListener("restoreMission", handleRestoreMission);
+  return () => window.removeEventListener("restoreMission", handleRestoreMission);
+}, []);
+
+
   return (
     <div className="h-full w-full relative">
       <Canvas ref={canvasRef} camera={{ position: [0, 5, 10], fov: 50 }}>
