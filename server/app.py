@@ -90,6 +90,82 @@ def save_mission_json():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/list-missions', methods=['GET'])
+def list_missions():
+    try:
+        missions_dir = 'missions'
+        if not os.path.exists(missions_dir):
+            os.makedirs(missions_dir)
+            return jsonify({'success': True, 'missions': []})
+        
+        missions = []
+        for folder_name in os.listdir(missions_dir):
+            folder_path = os.path.join(missions_dir, folder_name)
+            if os.path.isdir(folder_path):
+                metadata_file = os.path.join(folder_path, 'mission_metadata.json')
+                if os.path.exists(metadata_file):
+                    try:
+                        with open(metadata_file, 'r') as f:
+                            metadata = json.load(f)
+                        
+                        missions.append({
+                            'name': metadata.get('missionName', folder_name),
+                            'folderName': folder_name,
+                            'createdAt': metadata.get('generatedAt', ''),
+                            'totalAssets': metadata.get('totalAssets', 0)
+                        })
+                    except json.JSONDecodeError:
+                        print(f"Error reading metadata for {folder_name}")
+                        continue
+        
+        missions.sort(key=lambda x: x['createdAt'], reverse=True)
+        print(f"Found {len(missions)} missions")
+        return jsonify({'success': True, 'missions': missions})
+    
+    except Exception as e:
+        print(f"Error in list_missions: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/load-mission/<folder_name>', methods=['GET'])
+def load_mission(folder_name):
+    try:
+        mission_folder = os.path.join('missions', folder_name)
+        if not os.path.exists(mission_folder):
+            return jsonify({'success': False, 'error': 'Mission not found'})
+        
+        metadata_file = os.path.join(mission_folder, 'mission_metadata.json')
+        if not os.path.exists(metadata_file):
+            return jsonify({'success': False, 'error': 'Mission metadata not found'})
+            
+        with open(metadata_file, 'r') as f:
+            mission_data = json.load(f)
+        
+        terrain_file_url = None
+        original_terrain_name = None
+        
+        for filename in os.listdir(mission_folder):
+            if filename.endswith('.obj') and not filename.startswith(mission_data.get('missionName', 'mission')):
+                terrain_file_url = f"/missions/{folder_name}/{filename}"
+                original_terrain_name = filename
+                break
+        
+        return jsonify({
+            'success': True,
+            'missionData': mission_data,
+            'terrainFileUrl': terrain_file_url,
+            'originalTerrainName': original_terrain_name
+        })
+    
+    except Exception as e:
+        print(f"Error loading mission {folder_name}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/missions/<path:filename>')
+def serve_mission_file(filename):
+    try:
+        return send_from_directory('missions', filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 @app.route('/save-mission', methods=['POST'])
 def save_mission():
@@ -101,6 +177,7 @@ def save_mission():
             return jsonify({"error": "No data provided"}), 400
 
         # Extract mission data
+        mission_name = data.get('missionName', 'unnamed_mission')  # Get mission name
         filename = data.get('filename')
         content = data.get('content')
         mission_info = data.get('missionInfo', {})
@@ -109,9 +186,10 @@ def save_mission():
         if not filename or not content:
             return jsonify({"error": "Missing filename or content"}), 400
 
-        # Create a mission-specific folder with timestamp
-        timestamp = filename.replace('mission-plan-', '').replace('.obj', '')
-        mission_dir = os.path.join(os.getcwd(), "mission-files", f"mission-{timestamp}")
+        # Create mission folder with name and timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        mission_folder_name = f"{mission_name}_{timestamp}".replace(' ', '_')
+        mission_dir = os.path.join(os.getcwd(), "missions", mission_folder_name)  # Changed to 'missions'
         os.makedirs(mission_dir, exist_ok=True)
 
         # Sanitize filename
@@ -139,34 +217,33 @@ def save_mission():
                 original_file_path = os.path.join(UPLOAD_FOLDER, terrain_filename)
                 if os.path.exists(original_file_path):
                     # Copy original terrain to mission folder
-                    original_terrain_name = f"original-terrain-{terrain_model_name}"
+                    original_terrain_name = f"original_{terrain_filename}"
                     original_terrain_path = os.path.join(mission_dir, original_terrain_name)
                     import shutil
                     shutil.copy2(original_file_path, original_terrain_path)
 
-        # Save mission metadata as JSON
-        metadata_file = os.path.splitext(secure_name)[0] + '.json'
-        metadata_path = os.path.join(mission_dir, metadata_file)
+        # Save mission metadata as JSON with the expected filename
+        metadata_path = os.path.join(mission_dir, 'mission_metadata.json')  # Fixed filename
         
-        # Enhanced metadata with file paths
+        # Enhanced metadata with mission name
         enhanced_metadata = {
             **mission_info,
+            "missionName": mission_name,  # Add mission name to metadata
             "files": {
                 "mission_obj": secure_name,
                 "original_terrain": original_terrain_name if original_terrain_path else None,
-                "metadata": metadata_file
+                "metadata": "mission_metadata.json"
             },
             "mission_folder": mission_dir
         }
         
         with open(metadata_path, 'w') as f:
-            import json
             json.dump(enhanced_metadata, f, indent=2, default=str)
 
         # Create a README file for the mission
         readme_path = os.path.join(mission_dir, "README.txt")
         with open(readme_path, 'w') as f:
-            f.write(f"Mission Plan - {timestamp}\n")
+            f.write(f"Mission Plan - {mission_name}\n")
             f.write("=" * 50 + "\n\n")
             f.write(f"Generated: {mission_info.get('generatedAt', 'Unknown')}\n")
             f.write(f"Terrain Model: {mission_info.get('terrainModel', 'Unknown')}\n")
@@ -188,15 +265,15 @@ def save_mission():
             f.write(f"  - {secure_name} (Mission with deployed objects)\n")
             if original_terrain_path:
                 f.write(f"  - {original_terrain_name} (Original terrain model)\n")
-            f.write(f"  - {metadata_file} (Mission metadata)\n")
+            f.write(f"  - mission_metadata.json (Mission metadata)\n")
             f.write("  - README.txt (This file)\n")
 
         return jsonify({
             "success": True,
             "filename": secure_name,
             "path": mission_obj_path,
-            "mission_folder": mission_dir,
-            "metadata_file": metadata_file,
+            "mission_folder": mission_folder_name,  # Return folder name instead of full path
+            "metadata_file": "mission_metadata.json",
             "original_terrain_copied": original_terrain_path is not None,
             "message": "Mission saved successfully with all files"
         })

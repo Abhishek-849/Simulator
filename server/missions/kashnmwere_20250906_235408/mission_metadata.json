@@ -1,0 +1,87 @@
+{
+  "totalAssets": 5,
+  "assetBreakdown": {
+    "troops": 3,
+    "arsenal": 2
+  },
+  "missionDetails": {
+    "troops": 0,
+    "arsenal": 0,
+    "vehicles": 0,
+    "tanks": 0
+  },
+  "generatedAt": "2025-09-06T18:24:08.257Z",
+  "terrainModel": "file.obj",
+  "aoiPoints": [
+    {
+      "x": -1.0711788516730791,
+      "y": -0.16224012446634473,
+      "z": 0.28445271898670477
+    },
+    {
+      "x": -0.19306693079724546,
+      "y": 0.03345803665721547,
+      "z": -0.8071917736296648
+    },
+    {
+      "x": 0.850677215467682,
+      "y": -0.1149320779686116,
+      "z": 0.2568338268703121
+    },
+    {
+      "x": -0.08488848186950615,
+      "y": -0.15002500578251432,
+      "z": 1.4304972881171971
+    }
+  ],
+  "distancePoints": [],
+  "deployedItems": [
+    {
+      "position": [
+        -0.5925756105918638,
+        -0.1405084482011493,
+        0.39048282455831096
+      ],
+      "type": "troops"
+    },
+    {
+      "position": [
+        -0.43934497770463565,
+        -0.11582885644495047,
+        -0.1758309077618394
+      ],
+      "type": "troops"
+    },
+    {
+      "position": [
+        -0.30677718129856,
+        -0.10315906533002198,
+        0.49975754901356373
+      ],
+      "type": "troops"
+    },
+    {
+      "position": [
+        -0.10518692458560008,
+        -0.1563854487912703,
+        0.7853839586969769
+      ],
+      "type": "arsenal"
+    },
+    {
+      "position": [
+        0.1678875532962536,
+        -0.15688318814852747,
+        0.37963050308667334
+      ],
+      "type": "arsenal"
+    }
+  ],
+  "missionName": "kashnmwere",
+  "files": {
+    "mission_obj": "kashnmwere.obj",
+    "original_terrain": "original_2e4b56d1-6854-497d-ab28-36cc30fb9b6d_file.obj",
+    "metadata": "mission_metadata.json"
+  },
+  "mission_folder": "C:\\Users\\abhishek\\Desktop\\Prototype\\Simulator\\server\\missions\\kashnmwere_20250906_235408"
+}

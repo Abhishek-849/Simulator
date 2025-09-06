@@ -32,32 +32,97 @@ export default function TopPanel({ onModelSelect, onClearScene, setMissionDetail
     tanks: "",
   });
   const fileInputRef = useRef(null);
-
+  const [missionNameModal, setMissionNameModal] = useState(false);
+const [missionName, setMissionName] = useState('');
+const [pendingSaveData, setPendingSaveData] = useState(null);
   const fileInputMissionRef = useRef(null); // NEW - for loading JSON missions
 
-const loadMission = (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const missionData = JSON.parse(e.target.result);
-
-      // FIX: use deployedItems if items doesn’t exist
-      if (!missionData.items && missionData.deployedItems) {
-        missionData.items = missionData.deployedItems;
+const loadMissionList = async () => {
+  try {
+    const response = await fetch('http://localhost:5000/list-missions');
+    const result = await response.json();
+    
+    if (result.success && result.missions.length > 0) {
+      // Create mission selection dialog
+      const missionOptions = result.missions.map((mission, index) => 
+        `${index + 1}. ${mission.name} (${new Date(mission.createdAt).toLocaleDateString()})`
+      ).join('\n');
+      
+      const selection = prompt(`Select a mission to load:\n\n${missionOptions}\n\nEnter the number (1-${result.missions.length}):`);
+      
+      if (selection && !isNaN(selection)) {
+        const missionIndex = parseInt(selection) - 1;
+        if (missionIndex >= 0 && missionIndex < result.missions.length) {
+          const selectedMission = result.missions[missionIndex];
+          await loadSpecificMission(selectedMission);
+        } else {
+          alert('Invalid selection');
+        }
       }
-
-      window.dispatchEvent(new CustomEvent("restoreMission", { detail: missionData }));
-      alert(`✅ Mission loaded: ${missionData.missionName || "Unnamed Mission"}`);
-    } catch (err) {
-      alert(`❌ Failed to load mission: ${err.message}`);
+    } else {
+      alert('No saved missions found');
     }
-  };
-  reader.readAsText(file);
+  } catch (error) {
+    console.error('Error listing missions:', error);
+    alert(`❌ Error loading missions: ${error.message}`);
+  }
 };
 
+const loadSpecificMission = async (mission) => {
+  try {
+    // Load mission data
+    const response = await fetch(`http://localhost:5000/load-mission/${mission.folderName}`);
+    const result = await response.json();
+    
+    if (result.success) {
+      // Load terrain model first if available
+      if (result.terrainFileUrl && onModelSelect) {
+        // Create a file-like object from the terrain URL
+        const terrainResponse = await fetch(result.terrainFileUrl);
+        const terrainBlob = await terrainResponse.blob();
+        const terrainFile = new File([terrainBlob], result.originalTerrainName || 'terrain.obj', {
+          type: 'application/octet-stream'
+        });
+        
+        // Load the terrain model
+        onModelSelect(terrainFile);
+        
+        // Wait a bit for terrain to load before restoring mission data
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("restoreMission", { 
+            detail: {
+              items: result.missionData.deployedItems || result.missionData.items || [],
+              missionDetails: result.missionData.missionDetails || {},
+              aoiPoints: result.missionData.aoiPoints || [],
+              distancePoints: result.missionData.distancePoints || [],
+              missionName: mission.name
+            }
+          }));
+          
+          alert(`✅ Mission "${mission.name}" loaded successfully!`);
+        }, 1000);
+      } else {
+        // Load mission data without terrain
+        window.dispatchEvent(new CustomEvent("restoreMission", { 
+          detail: {
+            items: result.missionData.deployedItems || result.missionData.items || [],
+            missionDetails: result.missionData.missionDetails || {},
+            aoiPoints: result.missionData.aoiPoints || [],
+            distancePoints: result.missionData.distancePoints || [],
+            missionName: mission.name
+          }
+        }));
+        
+        alert(`⚠️ Mission "${mission.name}" loaded successfully!\nNote: Original terrain file not found - please load terrain manually.`);
+      }
+    } else {
+      throw new Error(result.error || 'Failed to load mission');
+    }
+  } catch (error) {
+    console.error('Error loading specific mission:', error);
+    alert(`❌ Error loading mission: ${error.message}`);
+  }
+};
 
 
   const handleFileSelect = (event) => {
@@ -115,224 +180,239 @@ const loadMission = (event) => {
     setIsModalOpen(false);
   };
 
-  const saveMission = async () => {
-    if (items.length === 0) {
-      alert('No deployed items to save. Please deploy troops, arsenal, vehicles, or tanks first.');
-      return;
-    }
+ const initiateSaveMission = () => {
+  if (items.length === 0) {
+    alert('No deployed items to save. Please deploy troops, arsenal, vehicles, or tanks first.');
+    return;
+  }
+  
+  // Open mission name modal
+  setMissionNameModal(true);
+  setMissionName('');
+  setOpenMenu(null);
+};
 
-    try {
-      // Generate OBJ content including deployed items
-      let objContent = '# Mission Plan OBJ File\n';
-      let vertexCount = 0;
+const saveMission = async () => {
+  if (!missionName.trim()) {
+    alert('Please enter a mission name');
+    return;
+  }
 
-      // Get current timestamp for filename
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `mission-plan-${timestamp}.obj`;
+  try {
+    // Generate OBJ content including deployed items
+    let objContent = '# Mission Plan OBJ File\n';
+    let vertexCount = 0;
 
-      // Build OBJ content from items
-      items.forEach((item, index) => {
-        const [x, y, z] = item.position;
-        const scale = item.type === 'troops' ? 0.03 : item.type === 'arsenal' ? 0.04 : item.type === 'vehicles' ? 0.08 : 0.12;
+    // Use mission name for filename instead of timestamp
+    const sanitizedName = missionName.trim().replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = `${sanitizedName}.obj`;
 
-        // Add object/group definition first
-        objContent += `o ${item.type}_${index + 1}\n`;
-        objContent += `g ${item.type}_${index + 1}\n`;
+    // Build OBJ content from items (keep existing OBJ generation code)
+    items.forEach((item, index) => {
+      const [x, y, z] = item.position;
+      const scale = item.type === 'troops' ? 0.03 : item.type === 'arsenal' ? 0.04 : item.type === 'vehicles' ? 0.08 : 0.12;
 
-        // Create different geometries based on item type
-        let geometryData;
-        switch (item.type) {
-          case 'troops':
-            // Simple cylinder approximation for troops (8-sided)
-            geometryData = {
-              vertices: [
-                // Bottom circle vertices
-                [scale, 0, 0],
-                [scale * 0.707, 0, scale * 0.707],
-                [0, 0, scale],
-                [-scale * 0.707, 0, scale * 0.707],
-                [-scale, 0, 0],
-                [-scale * 0.707, 0, -scale * 0.707],
-                [0, 0, -scale],
-                [scale * 0.707, 0, -scale * 0.707],
-                // Top circle vertices
-                [scale, scale * 2, 0],
-                [scale * 0.707, scale * 2, scale * 0.707],
-                [0, scale * 2, scale],
-                [-scale * 0.707, scale * 2, scale * 0.707],
-                [-scale, scale * 2, 0],
-                [-scale * 0.707, scale * 2, -scale * 0.707],
-                [0, scale * 2, -scale],
-                [scale * 0.707, scale * 2, -scale * 0.707],
-              ],
-              faces: [
-                // Bottom face
-                [1, 2, 3, 4, 5, 6, 7, 8],
-                // Top face
-                [16, 15, 14, 13, 12, 11, 10, 9],
-                // Side faces
-                [1, 9, 10, 2], [2, 10, 11, 3], [3, 11, 12, 4], [4, 12, 13, 5],
-                [5, 13, 14, 6], [6, 14, 15, 7], [7, 15, 16, 8], [8, 16, 9, 1]
-              ]
-            };
-            break;
-          case 'arsenal':
-            // Box for arsenal
-            geometryData = {
-              vertices: [
-                [-scale, 0, -scale],      // v1 bottom
-                [scale, 0, -scale],       // v2
-                [scale, 0, scale],        // v3
-                [-scale, 0, scale],       // v4
-                [-scale, scale * 2, -scale], // v5 top
-                [scale, scale * 2, -scale],  // v6
-                [scale, scale * 2, scale],   // v7
-                [-scale, scale * 2, scale],  // v8
-              ],
-              faces: [
-                [1, 4, 3, 2], // bottom
-                [5, 6, 7, 8], // top
-                [1, 2, 6, 5], // front
-                [3, 4, 8, 7], // back
-                [2, 3, 7, 6], // right
-                [4, 1, 5, 8]  // left
-              ]
-            };
-            break;
-          case 'vehicles':
-            // Longer box for vehicles
-            geometryData = {
-              vertices: [
-                [-scale*1.5, 0, -scale/2],      // v1 bottom
-                [scale*1.5, 0, -scale/2],       // v2
-                [scale*1.5, 0, scale/2],        // v3
-                [-scale*1.5, 0, scale/2],       // v4
-                [-scale*1.5, scale * 1.5, -scale/2], // v5 top
-                [scale*1.5, scale * 1.5, -scale/2],  // v6
-                [scale*1.5, scale * 1.5, scale/2],   // v7
-                [-scale*1.5, scale * 1.5, scale/2],  // v8
-              ],
-              faces: [
-                [1, 4, 3, 2], // bottom
-                [5, 6, 7, 8], // top
-                [1, 2, 6, 5], // front
-                [3, 4, 8, 7], // back
-                [2, 3, 7, 6], // right
-                [4, 1, 5, 8]  // left
-              ]
-            };
-            break;
-          case 'tanks':
-            // Large box for tanks
-            geometryData = {
-              vertices: [
-                [-scale, 0, -scale*1.2],      // v1 bottom
-                [scale, 0, -scale*1.2],       // v2
-                [scale, 0, scale],            // v3
-                [-scale, 0, scale],           // v4
-                [-scale, scale * 1.8, -scale*1.2], // v5 top
-                [scale, scale * 1.8, -scale*1.2],  // v6
-                [scale, scale * 1.8, scale],        // v7
-                [-scale, scale * 1.8, scale],       // v8
-              ],
-              faces: [
-                [1, 4, 3, 2], // bottom
-                [5, 6, 7, 8], // top
-                [1, 2, 6, 5], // front
-                [3, 4, 8, 7], // back
-                [2, 3, 7, 6], // right
-                [4, 1, 5, 8]  // left
-              ]
-            };
-            break;
-          default:
-            return; // Skip unknown types
-        }
+      // Add object/group definition first
+      objContent += `o ${item.type}_${index + 1}\n`;
+      objContent += `g ${item.type}_${index + 1}\n`;
 
-        // Store current vertex count before adding new vertices
-        const startVertexIndex = vertexCount + 1;
-
-        // Add vertices with position translation
-        geometryData.vertices.forEach(([vx, vy, vz]) => {
-          objContent += `v ${(x + vx).toFixed(6)} ${(y + vy).toFixed(6)} ${(z + vz).toFixed(6)}\n`;
-          vertexCount++;
-        });
-
-        // Add faces (OBJ face indices are 1-based and relative to start of this object)
-        geometryData.faces.forEach(face => {
-          const faceStr = face.map(idx => idx + startVertexIndex - 1).join(' ');
-          objContent += `f ${faceStr}\n`;
-        });
-
-        objContent += `\n`;
-      });
-
-      // Create mission summary comment
-      const totalItems = items.length;
-      const assetSummary = Object.entries(
-        items.reduce((acc, item) => {
-          acc[item.type] = (acc[item.type] || 0) + 1;
-          return acc;
-        }, {})
-      ).map(([type, count]) => `${count} ${type}`).join(', ');
-
-      objContent = `# Mission Plan - Assets: ${assetSummary} (Total: ${totalItems})\n` +
-                   `# Generated: ${new Date().toISOString()}\n` +
-                   `# Mission Details: Troops: ${missionDetails.troops}, Arsenal: ${missionDetails.arsenal}, Vehicles: ${missionDetails.vehicles}, Tanks: ${missionDetails.tanks}\n\n` +
-                   objContent;
-
-      // Send OBJ content to backend for saving
-      const response = await fetch('http://localhost:5000/save-mission', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename,
-          content: objContent,
-          missionInfo: {
-            totalAssets: totalItems,
-            assetBreakdown: items.reduce((acc, item) => {
-              acc[item.type] = (acc[item.type] || 0) + 1;
-              return acc;
-            }, {}),
-            missionDetails,
-            generatedAt: new Date().toISOString(),
-            terrainModel: layers.find(l => l.type === 'model')?.name || 'No terrain loaded',
-            aoiPoints: aoiPoints || [],
-            distancePoints: distancePoints || [],
-            deployedItems: items
-          },
-          originalTerrainFile: layers.find(l => l.type === 'model')?.file || null
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        const aoiCount = aoiPoints?.length || 0;
-        const distanceCount = distancePoints?.length || 0;
-        const terrainCopied = result.original_terrain_copied ? '✅ Original terrain included' : '⚠️ Original terrain not found';
-        
-        alert(`✅ Mission saved successfully!\n\n📁 Mission Folder: ${result.mission_folder}\n📊 Assets: ${totalItems}\n📍 AOI Points: ${aoiCount}\n📏 Distance Measurements: ${distanceCount}\n🗺️ ${terrainCopied}\n\nFiles created:\n• ${result.filename} (Mission with deployed objects)\n• ${result.metadata_file} (Mission metadata)\n• README.txt (Mission summary)`);
-      } else {
-        throw new Error(result.error || 'Unknown error occurred');
+      // Create different geometries based on item type
+      let geometryData;
+      switch (item.type) {
+        case 'troops':
+          // Simple cylinder approximation for troops (8-sided)
+          geometryData = {
+            vertices: [
+              // Bottom circle vertices
+              [scale, 0, 0],
+              [scale * 0.707, 0, scale * 0.707],
+              [0, 0, scale],
+              [-scale * 0.707, 0, scale * 0.707],
+              [-scale, 0, 0],
+              [-scale * 0.707, 0, -scale * 0.707],
+              [0, 0, -scale],
+              [scale * 0.707, 0, -scale * 0.707],
+              // Top circle vertices
+              [scale, scale * 2, 0],
+              [scale * 0.707, scale * 2, scale * 0.707],
+              [0, scale * 2, scale],
+              [-scale * 0.707, scale * 2, scale * 0.707],
+              [-scale, scale * 2, 0],
+              [-scale * 0.707, scale * 2, -scale * 0.707],
+              [0, scale * 2, -scale],
+              [scale * 0.707, scale * 2, -scale * 0.707],
+            ],
+            faces: [
+              // Bottom face
+              [1, 2, 3, 4, 5, 6, 7, 8],
+              // Top face
+              [16, 15, 14, 13, 12, 11, 10, 9],
+              // Side faces
+              [1, 9, 10, 2], [2, 10, 11, 3], [3, 11, 12, 4], [4, 12, 13, 5],
+              [5, 13, 14, 6], [6, 14, 15, 7], [7, 15, 16, 8], [8, 16, 9, 1]
+            ]
+          };
+          break;
+        case 'arsenal':
+          // Box for arsenal
+          geometryData = {
+            vertices: [
+              [-scale, 0, -scale],      // v1 bottom
+              [scale, 0, -scale],       // v2
+              [scale, 0, scale],        // v3
+              [-scale, 0, scale],       // v4
+              [-scale, scale * 2, -scale], // v5 top
+              [scale, scale * 2, -scale],  // v6
+              [scale, scale * 2, scale],   // v7
+              [-scale, scale * 2, scale],  // v8
+            ],
+            faces: [
+              [1, 4, 3, 2], // bottom
+              [5, 6, 7, 8], // top
+              [1, 2, 6, 5], // front
+              [3, 4, 8, 7], // back
+              [2, 3, 7, 6], // right
+              [4, 1, 5, 8]  // left
+            ]
+          };
+          break;
+        case 'vehicles':
+          // Longer box for vehicles
+          geometryData = {
+            vertices: [
+              [-scale*1.5, 0, -scale/2],      // v1 bottom
+              [scale*1.5, 0, -scale/2],       // v2
+              [scale*1.5, 0, scale/2],        // v3
+              [-scale*1.5, 0, scale/2],       // v4
+              [-scale*1.5, scale * 1.5, -scale/2], // v5 top
+              [scale*1.5, scale * 1.5, -scale/2],  // v6
+              [scale*1.5, scale * 1.5, scale/2],   // v7
+              [-scale*1.5, scale * 1.5, scale/2],  // v8
+            ],
+            faces: [
+              [1, 4, 3, 2], // bottom
+              [5, 6, 7, 8], // top
+              [1, 2, 6, 5], // front
+              [3, 4, 8, 7], // back
+              [2, 3, 7, 6], // right
+              [4, 1, 5, 8]  // left
+            ]
+          };
+          break;
+        case 'tanks':
+          // Large box for tanks
+          geometryData = {
+            vertices: [
+              [-scale, 0, -scale*1.2],      // v1 bottom
+              [scale, 0, -scale*1.2],       // v2
+              [scale, 0, scale],            // v3
+              [-scale, 0, scale],           // v4
+              [-scale, scale * 1.8, -scale*1.2], // v5 top
+              [scale, scale * 1.8, -scale*1.2],  // v6
+              [scale, scale * 1.8, scale],        // v7
+              [-scale, scale * 1.8, scale],       // v8
+            ],
+            faces: [
+              [1, 4, 3, 2], // bottom
+              [5, 6, 7, 8], // top
+              [1, 2, 6, 5], // front
+              [3, 4, 8, 7], // back
+              [2, 3, 7, 6], // right
+              [4, 1, 5, 8]  // left
+            ]
+          };
+          break;
+        default:
+          return; // Skip unknown types
       }
 
-    } catch (error) {
-      console.error('Error saving mission:', error);
-      alert(`❌ Error saving mission: ${error.message}`);
+      // Store current vertex count before adding new vertices
+      const startVertexIndex = vertexCount + 1;
+
+      // Add vertices with position translation
+      geometryData.vertices.forEach(([vx, vy, vz]) => {
+        objContent += `v ${(x + vx).toFixed(6)} ${(y + vy).toFixed(6)} ${(z + vz).toFixed(6)}\n`;
+        vertexCount++;
+      });
+
+      // Add faces (OBJ face indices are 1-based and relative to start of this object)
+      geometryData.faces.forEach(face => {
+        const faceStr = face.map(idx => idx + startVertexIndex - 1).join(' ');
+        objContent += `f ${faceStr}\n`;
+      });
+
+      objContent += `\n`;
+    });
+
+    // Create mission summary comment
+    const totalItems = items.length;
+    const assetSummary = Object.entries(
+      items.reduce((acc, item) => {
+        acc[item.type] = (acc[item.type] || 0) + 1;
+        return acc;
+      }, {})
+    ).map(([type, count]) => `${count} ${type}`).join(', ');
+
+    objContent = `# Mission Plan - Assets: ${assetSummary} (Total: ${totalItems})\n` +
+                 `# Generated: ${new Date().toISOString()}\n` +
+                 `# Mission Details: Troops: ${missionDetails.troops}, Arsenal: ${missionDetails.arsenal}, Vehicles: ${missionDetails.vehicles}, Tanks: ${missionDetails.tanks}\n\n` +
+                 objContent;
+
+    // Send OBJ content to backend for saving
+    const response = await fetch('http://localhost:5000/save-mission', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        missionName: missionName.trim(),
+        filename,
+        content: objContent,
+        missionInfo: {
+          totalAssets: totalItems,
+          assetBreakdown: items.reduce((acc, item) => {
+            acc[item.type] = (acc[item.type] || 0) + 1;
+            return acc;
+          }, {}),
+          missionDetails,
+          generatedAt: new Date().toISOString(),
+          terrainModel: layers.find(l => l.type === 'model')?.name || 'No terrain loaded',
+          aoiPoints: aoiPoints || [],
+          distancePoints: distancePoints || [],
+          deployedItems: items
+        },
+        originalTerrainFile: layers.find(l => l.type === 'model')?.file || null
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      const aoiCount = aoiPoints?.length || 0;
+      const distanceCount = distancePoints?.length || 0;
+      const terrainCopied = result.original_terrain_copied ? '✅ Original terrain included' : '⚠️ Original terrain not found';
+      
+      alert(`✅ Mission "${missionName}" saved successfully!\n\n📁 Mission Folder: ${result.mission_folder}\n📊 Assets: ${totalItems}\n📍 AOI Points: ${aoiCount}\n📏 Distance Measurements: ${distanceCount}\n🗺️ ${terrainCopied}\n\nFiles created:\n• ${result.filename} (Mission with deployed objects)\n• ${result.metadata_file} (Mission metadata)\n• README.txt (Mission summary)`);
+    } else {
+      throw new Error(result.error || 'Unknown error occurred');
     }
 
-    setOpenMenu(null);
-  };
+    // Close modal
+    setMissionNameModal(false);
+    setMissionName('');
+
+  } catch (error) {
+    console.error('Error saving mission:', error);
+    alert(`❌ Error saving mission: ${error.message}`);
+  }
+};
 
   return (
     <div className="bg-gray-900 text-white relative z-50 shadow-sm">
       <div className="flex items-center space-x-6 p-3">
         <div className="flex items-center gap-2 text-lg font-semibold">
           <Box size={20} className="text-blue-400" />
-          <span>Simulator Prototype</span>
+          <span>Mission Planning Toolkit 1.0</span>
         </div>
 
         {/* Menu bar */}
@@ -355,13 +435,16 @@ const loadMission = (event) => {
       <FolderOpen size={16} /> Open 3D Model
     </button>
     <button
-      onClick={saveMission}
+      onClick={initiateSaveMission}
       className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
     >
       <Save size={16} /> Save Mission
     </button>
     <button
-      onClick={() => fileInputMissionRef.current?.click()}
+      onClick={() => {
+        loadMissionList();
+        setOpenMenu(null);
+      }}
       className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-700 text-sm text-left"
     >
       <FolderOpen size={16} /> Load Mission
@@ -535,13 +618,6 @@ const loadMission = (event) => {
   onChange={handleFileSelect}
   className="hidden"
 />
-<input
-  type="file"
-  ref={fileInputMissionRef}
-  accept=".json"
-  onChange={loadMission}
-  className="hidden"
-/>
 
 
       {/* Mission Planning Modal */}
@@ -607,6 +683,45 @@ const loadMission = (event) => {
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+       {missionNameModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Save Mission</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mission Name</label>
+                <input
+                  type="text"
+                  value={missionName}
+                  onChange={(e) => setMissionName(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded text-sm bg-white text-black placeholder-gray-400"
+                  placeholder="Enter mission name"
+                  onKeyDown={(e) => e.key === 'Enter' && saveMission()}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setMissionNameModal(false);
+                  setMissionName('');
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveMission}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Save Mission
               </button>
             </div>
           </div>
