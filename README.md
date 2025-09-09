@@ -32,9 +32,10 @@ cd Simulator
    cd server
    ```
 
-2. Activate a virtual environment (recommended):
+2. Create and Activate a virtual environment (recommended):
    - Windows:
      ```bash
+     python -m venv venv
      .\venv\Scripts\activate
      ```
    - macOS/Linux:
